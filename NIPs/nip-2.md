@@ -1,186 +1,208 @@
 ---
 nip: 2
-title: DID-Based A2A Authentication
+title: DID-Based Authentication Protocol
+author: jolestar(@jolestar)
+discussions-to: <URL of the discussion thread, e.g., a GitHub issue or forum post>
 status: Draft
 type: Standards Track
 category: Core
 created: 2024-05-12
-version: 0.2
+requires: NIP-1 (DID Key Model)
 ---
-
-# NIP-2: DID-Based A2A Authentication
-
-
-**Related:** NIP-1 (DID Key Model)
 
 ## Abstract
 
-This specification defines a decentralized authentication protocol based on NIP-1 DIDs for A2A (Agent-to-Agent) communication. It leverages keys and verification relationships registered in the DID document to prove message origin and ensure integrity. Authentication information is conveyed via a custom HTTP header, associating the request directly with the originating Agent's DID and key, consistent with HTTP semantics for client authentication.
+This specification defines a general-purpose, decentralized authentication protocol based on NIP-1 DIDs. It enables any entity with a DID to prove its identity and the integrity of a message or request. The protocol leverages cryptographic signatures generated using keys associated with a DID, as registered in the corresponding DID document. It outlines a core authentication mechanism and then details its application across various communication patterns, including Agent-to-Agent (A2A) messaging, JSON-RPC services, and RESTful APIs, primarily utilizing the standard HTTP `Authorization` header or embedded authentication structures for non-HTTP contexts.
 
 ## Motivation
 
-To align with the unified DID model proposed in NIP-1, where a DID and its associated keys represent the Agent instance itself, A2A communication requires a standardized authentication mechanism placed appropriately within the HTTP request structure. Placing DID-based authentication in the HTTP header aligns with standard practices for client authentication while ensuring message integrity for the A2A payload.
+As decentralized systems and agent-based architectures evolve, a standardized, flexible, and secure authentication mechanism is crucial. NIP-1 provides a foundational DID key model. This NIP builds upon that by specifying how these DIDs and their associated keys can be used for robust authentication across diverse interaction protocols. The goal is to provide a unified approach to verifying the origin and integrity of communications, whether between autonomous agents, clients and servers, or other interacting components. This NIP addresses the need for a common authentication layer adaptable to HTTP-based interactions (like REST APIs and RPC over HTTP using the standard `Authorization` header) as well as other message-oriented protocols.
 
-## Protocol Details
+## Specification
 
-### HTTP Header for Authentication
+### Core DID Authentication Mechanism
 
-A custom HTTP header named `X-DID-Signature` is used to convey the authentication credentials.
+This section describes the fundamental components and processes common to all applications of this DID-based authentication protocol.
 
-The value of the `X-DID-Signature` header **must** be the **Base64 Encoding** (using the URL and Filename Safe Alphabet, often referred to as "base64url") of a UTF-8 encoded JSON string. The decoded JSON string has the following structure:
+#### 1. Authentication Data Structure
+
+At its core, the authentication information relies on the following data elements, typically serialized as a JSON object:
 
 ```json
 {
-  "signer_did": "did:rooch:...",       // DID of the initiating Agent
-  "key_id": "did:rooch:...#key-id", // Full key ID used for signing (verificationMethod id)
-  "signature_value": "..."          // Signature (Base64 or Hex encoded)
+  "signer_did": "did:example:...",
+  "key_id": "did:example:...#key-id",
+  "signature_value": "..."
 }
 ```
+Where:
+*   `signer_did`: DID of the entity performing the authentication.
+*   `key_id`: Full key ID (verificationMethod id from DID doc) used for signing.
+*   `signature_value`: Cryptographic signature (Base64 or Hex encoded).
 
-### Signed Content
+#### 2. Signed Content and Hashing
 
-The `signature_value` within the `X-DID-Signature` header is calculated over the hash of the **entire JSON-RPC request body** relevant to the A2A message, specifically the `params` object of the `tasks/send` method (which contains the `message.parts`).
+The `signature_value` is a cryptographic signature calculated over a hash of the content being authenticated.
 
 **Hashing Process:**
-`hash = SHA256(domainSeparator + JSON.stringify(message.parts))`
-*   `domainSeparator`: A string that clearly identifies this protocol and version, e.g., `"NUWA_A2A_AUTH_V1:"`.
-*   `message.parts`: The JSON object containing the A2A message content, including `timestamp` and `nonce`, found within the JSON-RPC request body (e.g., `params.message.parts` for `tasks/send`).
+`hash = HASH_ALGORITHM(domainSeparator + contentToSign)`
 
-## Authentication Flow
+*   `HASH_ALGORITHM`: A strong cryptographic hash function (e.g., SHA256). The specific algorithm should be implied by the key type or explicitly defined by the application protocol.
+*   `domainSeparator`: A protocol-specific string that clearly identifies the context of the signature (e.g., `"EXAMPLE_A2A_AUTH_V1:"`, `"MY_RPC_API_V2_SIGNATURE:"`). This prevents replay attacks across different protocols or application domains.
+*   `contentToSign`: The actual data whose integrity and origin are being authenticated. This could be an HTTP request body, specific fields from a message, a JSON-RPC request object, or any other defined payload. This content **must** include a `timestamp` (e.g., Unix timestamp in seconds) and a `nonce` (a unique random string) to prevent replay attacks.
 
+#### 3. General Authentication Flow (Conceptual)
 
-
+The flow involves a **Signer** (the entity authenticating) and a **Verifier** (the entity validating the authentication).
 
 ```mermaid
 graph TD
-    A[Client: Message Construction] --> B{Client: Identify Identity and Key};
-    B --> C[Client: Hash Generation];
-    C --> D[Client: Signing];
-    D --> E[Client: Build HTTP Header];
-    E --> F[Client: Send Request];
-    F --> G[Server: Receive and Parse];
-    G --> H{Server: Verify Replay Protection};
-    H -- Failed --> X[Error: Replay Attack Detected];
-    H -- Passed --> I[Server: Recalculate Hash];
-    I --> J{Server: Resolve DID and Get Public Key};
-    J -- Failed --> Y[Error: DID Resolution Failed / Key Not Found];
-    J -- Passed --> K{Server: Verify Signature};
-    K -- Failed --> Z[Error: Invalid Signature];
-    K -- Passed --> L{Server: Verify Permissions};
-    L -- Failed --> AA[Error: Permission Denied];
-    L -- Passed --> M[Server: Confirm Identity];
-    M --> N[Server: Process Request];
-    N --> O[Server: Respond];
+    subgraph Signer
+        A[Construct Message/Request with Timestamp & Nonce] --> B{Identify Own DID and Signing Key};
+        B --> C[Define Domain Separator and Content to Sign];
+        C --> D[Calculate Hash: HASH_ALGORITHM(domainSeparator + contentToSign)];
+        D --> E[Sign Hash with Private Key, Obtain signature_value];
+        E --> F[Assemble Authentication Data: {signer_did, key_id, signature_value}];
+    end
+    subgraph Verifier
+        G[Receive Message/Request and Authentication Data] --> H{Parse Authentication Data};
+        H --> I[Extract Timestamp & Nonce from Message/Request];
+        I --> J{Verify Replay Protection (Timestamp window, Nonce uniqueness)};
+        J -- Failed --> X[Error: Replay Attack];
+        J -- Passed --> K[Reconstruct Content to Sign (using received message parts)];
+        K --> L[Calculate HashToVerify: HASH_ALGORITHM(domainSeparator + contentToSign)];
+        L --> M{Resolve signer_did to get DID Document};
+        M -- Failed --> Y[Error: DID Resolution Failed];
+        M -- Passed --> N{Find Public Key for key_id in DID Document};
+        N -- Failed --> Z[Error: Key Not Found];
+        N -- Passed --> O{Verify Signature using Public Key and HashToVerify};
+        O -- Failed --> AA[Error: Invalid Signature];
+        O -- Passed --> P{Verify Key Permissions (e.g., 'authentication' relationship)};
+        P -- Failed --> BB[Error: Permission Denied];
+        P -- Passed --> Q[Authentication Successful: Identity Confirmed];
+    end
+    F --> G;
 ```
 
-1.  **Message Construction (Client):** The requesting Agent (Client) constructs the A2A `message.parts` object. This object **must** include `timestamp` (Unix timestamp, seconds) and `nonce` (unique random string) to prevent replay attacks.
-2.  **Identify Identity and Key (Client):** The Client determines its identity `signer_did` (e.g., `did:rooch:alice`) and the key `key_id` (e.g., `did:rooch:alice#device-key-1`) to be used for signing. This key must be registered in the `signer_did`'s DID document and possess appropriate permissions (e.g., `authentication` or `capabilityInvocation`).
-3.  **Hash Generation (Client):** The Client calculates the hash of the `message.parts`: `hash = SHA256(domainSeparator + JSON.stringify(message.parts))`.
-4.  **Signing (Client):** The Client signs the `hash` using the private key corresponding to `key_id` to generate the `signature_value`.
-5.  **Build HTTP Header (Client):** The Client constructs the JSON object containing `signer_did`, `key_id`, and the `signature_value`. It then serializes this object to a UTF-8 JSON string and **encodes this string using Base64url** to get the final header value.
-6.  **Send Request (Client):** The Client sends the HTTP POST request to the Server Agent's endpoint. The request includes:
-    *   The `X-DID-Signature` header containing the Base64url encoded string.
-    *   The JSON-RPC request body containing the method (e.g., `tasks/send`) and `params` (which includes the `message.parts` object).
-7.  **Receive and Parse (Server):** The Server receives the HTTP request.
-    *   It extracts the Base64url encoded string from the `X-DID-Signature` header.
-    *   It **decodes the Base64url string** to get the UTF-8 JSON string.
-    *   It **parses the JSON string** to get `signer_did`, `key_id`, `signature_value`.
-    *   It parses the JSON-RPC request body to get the `message.parts` object.
-8.  **Verify Replay Protection (Server):**
-    *   Extract `timestamp` and `nonce` from the received `message.parts`.
-    *   Verify that `timestamp` is within an acceptable time window.
-    *   Verify that `nonce` has not been previously used by `signer_did` (requires stateful storage).
-9.  **Recalculate Hash (Server):** Recalculate `hashToVerify = SHA256(domainSeparator + JSON.stringify(message.parts))` using the same `domainSeparator` and the received `message.parts`.
-10. **Resolve DID and Get Public Key (Server):**
-    *   Use a DID resolver to resolve `signer_did` and obtain its DID document.
-    *   Find the entry in the `verificationMethod` list of the DID document where `id` matches `key_id`. If not found, verification fails.
-    *   Extract the public key information (e.g., `publicKeyHex`, `publicKeyMultibase`) from the found `verificationMethod`.
-11. **Verify Signature (Server):**
-    *   Use the public key obtained from the DID document and the calculated `hashToVerify` to verify the `signature_value`. If the signature is invalid, verification fails.
-12. **Verify Permissions (Server):**
-    *   Check if `key_id` is present in the `authentication` verification relationship list within the `signer_did`'s DID document. For Agent-to-Agent communication where the key represents the agent, `authentication` is typically the correct relationship to check. If the `key_id` is not in the `authentication` list, verification fails.
-13. **Confirm Identity (Server):** If all verification steps (replay protection, signature, permissions) pass, authentication is successful. The requesting Agent's identity is confirmed as `signer_did`, acting via `key_id`.
-14. **Process Request (Server):** The Server processes the request in the JSON-RPC body based on the verified Agent identity (`signer_did`).
-15. **Respond (Server):** The Server returns an HTTP response (containing the JSON-RPC response).
+**Steps:**
 
+1.  **Message/Request Construction (Signer):** The Signer constructs the primary message or request. This payload **must** include a `timestamp` and a `nonce`.
+2.  **Identify Identity and Key (Signer):** The Signer identifies its `signer_did` and the specific `key_id` to be used for signing. This key must be listed in the `verificationMethod` section of the `signer_did`'s DID document.
+3.  **Define Content and Separator (Signer):** The Signer determines the exact `contentToSign` and the appropriate `domainSeparator`.
+4.  **Hash Generation (Signer):** The Signer calculates the hash.
+5.  **Signing (Signer):** The Signer signs the hash using the private key corresponding to `key_id`.
+6.  **Assemble Authentication Data (Signer):** The Signer creates the JSON structure with `signer_did`, `key_id`, and `signature_value`.
+7.  **Transmit (Signer):** The Signer sends the original message/request along with the assembled authentication data (e.g., in an HTTP header or embedded in the message).
+8.  **Receive and Parse (Verifier):** The Verifier receives the message/request and the authentication data. It parses the authentication data.
+9.  **Verify Replay Protection (Verifier):** The Verifier extracts `timestamp` and `nonce` from the received message/request. It checks if the `timestamp` is within an acceptable window and if the `nonce` has not been used before by this `signer_did`.
+10. **Recalculate Hash (Verifier):** The Verifier reconstructs the `contentToSign` from the received message/request and uses the same `domainSeparator` and `HASH_ALGORITHM` to calculate `hashToVerify`.
+11. **Resolve DID and Get Public Key (Verifier):** The Verifier resolves `signer_did` to get its DID document, then finds the public key information associated with `key_id`.
+12. **Verify Signature (Verifier):** The Verifier uses the public key to validate the `signature_value` against `hashToVerify`.
+13. **Verify Permissions (Verifier):** The Verifier checks if the `key_id` is authorized for authentication, typically by checking its presence in the `authentication` verification relationship in the DID document.
+14. **Confirmation (Verifier):** If all checks pass, the Verifier confirms the Signer's identity as `signer_did`.
 
-## Identity Representation
+### Application: HTTP-based Authentication (REST APIs, RPC over HTTP)
 
-After successful verification, the identity confirmed by the Server is the `signer_did` (representing the Agent instance) declared in the `X-DID-Signature` header.
+For services communicating over HTTP (e.g., RESTful APIs, JSON-RPC over HTTP), authentication is conveyed via the standard `Authorization` HTTP header.
 
-## Error Codes
+#### 1. HTTP Header
 
-Failures during the authentication steps (parsing header, replay check, DID resolution, signature/permission verification) should result in appropriate HTTP error responses (e.g., `401 Unauthorized` or `400 Bad Request`) potentially with a JSON body detailing the specific NIP-2 error.
+The `Authorization` HTTP header is used with the `DIDAuthV1` scheme. The header is constructed as follows:
 
-*   **DID Resolution Failed**: Could not resolve `signer_did` or fetch the DID document.
-*   **Key Not Found**: `key_id` not found in the DID document.
-*   **Permission Denied**: `key_id` not present in the required verification relationship (`authentication`).
-*   **Invalid Signature**: Signature verification failed.
-*   **Replay Attack Detected**: `nonce` reused or invalid `timestamp`.
-*   **Invalid Header Format**: `X-DID-Signature` header is missing, malformed, or fails Base64url decoding or subsequent JSON parsing.
+`Authorization: DIDAuthV1 <credentials>`
 
-## Security Considerations
+Where `<credentials>` **must** be the **Base64url encoding** of the UTF-8 encoded JSON string representing the Core Authentication Data Structure.
 
-*   **Inherited from NIP-1:** The security of this protocol heavily relies on the security of the DID method, master key management, device key registration/revocation, and DID document update processes defined in NIP-1.
-*   **Replay Attacks:** Validation of `timestamp` and `nonce` within the signed `message.parts` is critical. Servers must maintain stateful nonce storage keyed by `signer_did`.
-*   **Transport Security:** Communication **must** use TLS/HTTPS to protect the confidentiality and integrity of the request/response, including the header.
-*   **DID Resolver Security:** Servers must use a trusted DID resolver.
-*   **Verification Relationship Check:** Servers **must** check that the signing key (`key_id`) is present in the appropriate verification relationship (usually `authentication`).
-*   **Domain Separator:** The `domainSeparator` prevents signatures from being misused.
-*   **Header Integrity:** While TLS protects against eavesdropping, ensure server-side infrastructure (proxies, gateways) does not unintentionally modify or strip the `X-DID-Signature` header.
-*   **Signature covers Body:** Clearly specify and enforce that the signature in the header covers the relevant parts of the message body. Mismatches lead to security failures.
+#### 2. Signed Content (`contentToSign`)
 
-## Protocol Identifier
+For HTTP-based authentication, `contentToSign` typically includes:
+*   The **full HTTP request body**.
+*   Optionally, other parts of the HTTP request (e.g., method, path, relevant headers) can be canonicalized and included if they need to be part of the integrity check. The exact definition of `contentToSign` must be specified by the API or service.
+*   Crucially, the `timestamp` and `nonce` values used in the hashing process **must** be present in the request body or headers, as defined by the service, to allow the verifier to perform replay protection.
 
-Within the `authentication` field of an A2A message, the authentication scheme defined by this protocol should use the following identifier:
+**Example `domainSeparator` for an HTTP API:** `"MY_API_V1_HTTP_AUTH:"`
 
-*   `did-auth-v1`: Indicates authentication using NIP-1 DIDs and associated keys.
+#### 3. Error Handling
 
-## A2A AuthenticationInfo Structure
+Failures should result in standard HTTP error responses (e.g., `401 Unauthorized`, `400 Bad Request`), potentially with a JSON body detailing the specific error based on NIP-2 codes (see "General Error Codes" below).
 
-The `authentication` field in the A2A request has the following structure:
+### Application: Agent-to-Agent (A2A) Communication
+
+For Agent-to-Agent (A2A) communication:
+*   If the A2A communication occurs over HTTP, the HTTP-based authentication method described above (using the `Authorization: DIDAuthV1 <credentials>` header) **should** be used.
+*   If A2A communication uses a non-HTTP transport, or if direct embedding of authentication data within the message payload is preferred for specific protocol reasons, the following embedded mechanism can be used.
+
+#### 1. Protocol Identifier (for embedded method)
+
+The scheme is identified by `did-auth-v1`.
+
+#### 2. Embedded Authentication Structure (for non-HTTP or preferred embedding)
+
+An A2A message requiring authentication (when not using the HTTP `Authorization` header method) would include a field (e.g., `authentication`) structured as:
 
 ```json
 {
   "schemes": ["did-auth-v1"],
-  "credentials": "<json_string>"
+  "credentials": "<json_string_of_core_auth_data>"
 }
 ```
+Where `credentials` is the JSON string of the Core Authentication Data Structure.
 
-Where `credentials` is a JSON string which, when parsed, results in:
+#### 3. Signed Content (`contentToSign`) (for embedded method)
 
-```json
-{
-  "signer_did": "did:rooch:...",       // DID of the initiator
-  "key_id": "did:rooch:...#key-id", // Full key ID used for signing (verificationMethod id)
-  "signature_value": "..."          // Signature over the message hash (Base64 or Hex encoded)
-}
-```
+For A2A using the embedded method, `contentToSign` is typically the `message.parts` object (or a similar well-defined part of the A2A message payload), which **must** include `timestamp` and `nonce`.
 
-## Identity Representation
+**Example `domainSeparator` for A2A (embedded method):** `"EXAMPLE_A2A_EMBEDDED_AUTH_V1:"`
 
-After successful verification, the identity confirmed by the Server is the `signer_did` declared in the `credentials`.
+#### 4. Error Handling (for embedded method)
 
-## Error Codes
+Errors are typically handled according to the A2A protocol's error reporting mechanisms, using NIP-2 error codes (see "General Error Codes" below).
 
-Standard JSON-RPC error codes are recommended, with specific errors defined:
+### General Error Codes
 
-*   `-32602 Invalid Params`: Request format error, missing fields, invalid `timestamp`/`nonce`, incorrect signature/public key format, etc.
-*   `-32001 Invalid Credentials`:
-    *   Signature verification failed.
-    *   `key_id` not found in the DID document.
-    *   `key_id` not present in the required verification relationship (`authentication` or `capabilityInvocation`).
-*   `-32004 DID Resolution Failed`: Could not resolve `signer_did` or fetch the DID document.
-*   `-32005 Replay Attack Detected`: `nonce` reused or invalid `timestamp`.
-*   `-32002 Authentication Required`: Authentication information was not provided.
-*   `-32003 Unsupported Scheme`: (Theoretically less common if only `did-auth-v1` is supported)
+These error codes can be adapted for use in HTTP responses or embedded error structures.
+
+*   **DID Resolution Failed**: Could not resolve `signer_did` or fetch the DID document. (e.g., JSON-RPC: `-32004`)
+*   **Key Not Found**: `key_id` not found in the DID document. (e.g., JSON-RPC: part of `-32001`)
+*   **Permission Denied**: `key_id` not present in the required verification relationship (e.g., `authentication`). (e.g., JSON-RPC: part of `-32001`)
+*   **Invalid Signature**: Signature verification failed. (e.g., JSON-RPC: part of `-32001`)
+*   **Replay Attack Detected**: `nonce` reused or invalid `timestamp`. (e.g., JSON-RPC: `-32005`)
+*   **Invalid Authentication Format**: Authentication data (e.g., `Authorization` header with `DIDAuthV1` scheme, or `credentials` field in embedded A2A) is missing, malformed, or fails decoding/parsing. (e.g., HTTP: `400 Bad Request`; JSON-RPC: `-32602 Invalid Params`)
+*   **Authentication Required**: Authentication information was not provided. (e.g., HTTP: `401 Unauthorized`; JSON-RPC: `-32002`)
+*   **Unsupported Scheme**: The authentication scheme is not supported (relevant if multiple schemes can be indicated, or if `DIDAuthV1` is not supported by the verifier). (e.g., JSON-RPC: `-32003`)
+
+## Rationale
+
+*(Placeholder: Detailed rationale to be added. Key design choices include: a general core mechanism for broad applicability, use of domain separators for security, inclusion of timestamp/nonce for replay protection, specific adaptations for HTTP and A2A common patterns.)*
+Using the standard `Authorization` HTTP header with a custom scheme (`DIDAuthV1`) for REST/RPC APIs aligns with common HTTP practices (e.g., `Bearer`, `Basic` schemes) and avoids proliferation of custom headers. This makes it easier for existing HTTP infrastructure and libraries to handle.
+For A2A communication, prioritizing the HTTP `Authorization` header method when A2A occurs over HTTP promotes consistency. The embedded authentication data structure is provided for scenarios where A2A does not run over HTTP or where direct message-level security is preferred.
+The JSON structure for authentication data is chosen for its widespread support and ease of parsing. Base64url encoding for the credentials in the `Authorization` header is standard for such use cases.
+
+## Backwards Compatibility
+
+*(Placeholder: Details on backwards compatibility to be added. This NIP defines new authentication mechanisms. Systems not implementing it will not understand the `Authorization` header with the `DIDAuthV1` scheme or the `did-auth-v1` scheme in embedded A2A messages. Services can choose to support multiple authentication schemes for transition periods.)*
+
+## Test Cases
+
+*(Placeholder: Test cases to be added, covering: valid/invalid signatures for HTTP and A2A, replay attempts, DID resolution failures, key permission issues, malformed headers/credentials.)*
+
+## Reference Implementation
+
+*(Placeholder: Link to reference implementation to be added.)*
 
 ## Security Considerations
 
-*   **Inherited from NIP-1:** The security of this protocol heavily relies on the security of the DID method, master key management, device key registration/revocation, and DID document update processes defined in NIP-1.
-*   **Replay Attacks:** Validation of `timestamp` and `nonce` is critical. Servers must maintain stateful nonce storage.
-*   **Transport Security:** The A2A communication channel should be protected using TLS/HTTPS.
-*   **DID Resolver Security:** Servers must use a trusted DID resolver to obtain DID documents.
-*   **Verification Relationship Check:** Servers **must** check that the signing key (`key_id`) is present in the appropriate verification relationship (usually `authentication`). Simply verifying the signature is insufficient. An incorrect or revoked key, even if it can successfully verify a signature, should not be accepted.
-*   **Domain Separator:** The `domainSeparator` prevents signatures from being misused across different protocols or applications.
+*   **Inherited from NIP-1:** Security relies heavily on NIP-1's DID method security, key management, and DID document integrity.
+*   **Replay Attacks:** Strict validation of `timestamp` and `nonce` is critical. Verifiers **must** maintain stateful nonce storage scoped by `signer_did` and `domainSeparator`.
+*   **Transport Security:** Communication channels (e.g., HTTP, A2A transport) **must** use TLS/HTTPS or equivalent transport-layer security to protect confidentiality and integrity of the entire exchange, including authentication data.
+*   **DID Resolver Security:** Verifiers must use a trusted DID resolver.
+*   **Verification Relationship Check:** Verifiers **must** check that the signing key (`key_id`) is present in the appropriate verification relationship (usually `authentication`) in the DID document.
+*   **Domain Separator:** The `domainSeparator` is crucial to prevent cross-protocol or cross-application signature replay. It must be unique and well-defined for each application of this NIP.
+*   **Signature Scope (`contentToSign`):** The definition of `contentToSign` must be precise and cover all security-relevant parts of the message/request. Ambiguity can lead to vulnerabilities.
+*   **Header/Credential Integrity:** For HTTP, ensure infrastructure (proxies, gateways) doesn't unintentionally modify or strip the `Authorization` header. For embedded credentials, ensure they are part of the overall message integrity protection if available.
+*   **Key Compromise:** Revocation mechanisms for compromised keys (as defined by the DID method and NIP-1) are essential. Verifiers should fetch fresh DID documents or use a resolver that respects DID document caching and update rules.
+
+## Copyright
+
+Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
 
