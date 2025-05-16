@@ -1,5 +1,5 @@
 ---
-nip: 9
+nip: 3
 title: Custodian Registry & Delegated-Control Protocol
 status: Draft
 type: Standards Track — Meta
@@ -12,14 +12,14 @@ license: CC-BY-SA-4.0
 
 # 0 Summary
 
-*NIP-9* specifies a **Custodian Registry** smart-contract interface and an off-chain **Delegated-Control Protocol** that allow Web2 users to create Nuwa Agent DIDs without holding a wallet. A *Custodian* is an on-chain-registered service that temporarily controls the `controller` field of a freshly minted Agent DID and offers one or more Web2 authentication methods (e.g. Google OAuth, Passkey).  
+*NIP-3* specifies a **Custodian Registry** smart-contract interface and an off-chain **Delegated-Control Protocol** that allow Web2 users to create Nuwa Agent DIDs without holding a wallet. A *Custodian* is an on-chain-registered service that temporarily controls the `controller` field of a freshly minted Agent DID and offers one or more Web2 authentication methods (e.g. Google OAuth, Passkey).  
 Users may later replace the custodian with another service or with their own wallet via a single DID-document update.
 
 ---
 
 # 1 Motivation
 
-| Pain point | Effect | Solution offered by NIP-9 |
+| Pain point | Effect | Solution offered by NIP-3 |
 |------------|--------|---------------------------|
 | Web2 users have **no crypto wallet** | Cannot sign the on-chain DID-creation tx | Custodian does it on their behalf |
 | Ecosystem needs **multiple custodians** | Avoid vendor lock-in | Registry contract lists and ranks custodians |

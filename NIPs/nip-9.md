@@ -1,4 +1,4 @@
-# NIP-5: Agent LLM Gateway Protocol
+# NIP-9: Agent LLM Gateway Protocol
 
 ## Summary
 

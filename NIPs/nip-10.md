@@ -1,5 +1,5 @@
 ---
-nip: 6
+nip: 10
 title: MCP Identity Authentication and Payment Extension Protocol
 status: Draft
 type: Standards Track
@@ -8,7 +8,7 @@ created: 2025-05-13
 version: 0.1
 ---
 
-# NIP-6: MCP Identity Authentication and Payment Extension Protocol (Draft)
+# NIP-10: MCP Identity Authentication and Payment Extension Protocol (Draft)
 
 ## 1. Motivation
 

@@ -1,5 +1,5 @@
 ---
-nip: 10
+nip: 5
 title: Fiat-Proxy Top-Up Protocol (FPTP)
 status: Draft
 type: Standards Track — Payments
@@ -11,7 +11,7 @@ license: CC-BY-SA-4.0
 ---
 
 # 0 Summary
-NIP-10 standardises **Fiat-Proxy Top-Up** for Nuwa Agents across different blockchain environments:
+NIP-5 standardises **Fiat-Proxy Top-Up** for Nuwa Agents across different blockchain environments:
 
 * A **Proxy Registry** smart-contract is deployed on each participating blockchain (with an example implementation in Move/Solidity provided for illustration). This registry allows any licensed service (“Fiat Proxy”), identified by a DID (NIP-1), to register on-chain for specific tokens it supports on that chain.
 * Web2 users pay the proxy with card/Apple Pay/etc.; the proxy immediately mints or transfers the specified on-chain token (e.g., **RGas** on Rooch, or a similar native/utility token on other chains) to the user’s Agent DID on that specific blockchain.

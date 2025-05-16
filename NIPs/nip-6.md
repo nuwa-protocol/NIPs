@@ -1,5 +1,5 @@
 ---
-nip: 4
+nip: 6
 title: Agent Multi-Device State Synchronization
 status: Draft
 type: Standards Track
@@ -8,7 +8,7 @@ created: 2025-05-13
 version: 0.1
 ---
 
-# NIP-4: Agent Multi-Device State Synchronization
+# NIP-6: Agent Multi-Device State Synchronization
 
 **Status:** Draft
 

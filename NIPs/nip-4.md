@@ -1,5 +1,5 @@
 ---
-nip: 3
+nip: 4
 title: A2A Agent Service Payment Protocol
 status: Draft
 type: Standards Track
@@ -8,7 +8,7 @@ created: 2025-05-13
 version: 0.1
 ---
 
-# NIP-3: A2A Agent Service Payment Protocol
+# NIP-4: A2A Agent Service Payment Protocol
 
 ## 📌 Abstract
 
