@@ -1,6 +1,6 @@
 ---
 nip: 4
-title: A2A Agent Service Payment Protocol
+title: A2A Payment Channel Protocol
 author: jolestar(@jolestar)
 discussions-to: <Link to discussion thread>
 status: Draft
@@ -13,90 +13,66 @@ requires: NIP-1, NIP-2
 
 ## Abstract
 
-This NIP defines a protocol for on-demand payment for services provided by AI Agents within the Nuwa ecosystem. It builds upon NIP-1 (DID Model) and NIP-2 (A2A Authentication) to enable secure and verifiable payment transactions between a User Agent (Client) and an AI Agent (Service Provider). This protocol outlines mechanisms for pre-payment per service and a state channel model for continuous/streaming payments, where the User Agent authorizes and confirms payment.
+This NIP defines a general-purpose A2A (Agent-to-Agent) Payment Channel protocol. It provides a mechanism for establishing, managing, and settling bilateral payment channels between participants in the AI Agent ecosystem. These channels are designed to facilitate efficient, low-cost, off-chain micropayments, particularly suited for automated or high-frequency protocol-level payments, such as fees for A2A message routing, API gateway access (e.g., as per NIP-9), or other foundational agent interactions. This protocol aims to provide a core infrastructure component that can be leveraged by various higher-level NIPs or applications requiring a standardized off-chain payment solution.
 
 ## Motivation
 
-As AI Agents offer valuable computational services, a standardized payment mechanism is crucial for incentivizing service provision and enabling a sustainable Agent economy. This protocol aims to provide a secure, transparent, and DID-based method for User Agents to pay AI Agents for their services, ensuring that payments are tied to verifiable identities and communication is authenticated.
+Many interactions within a decentralized agent ecosystem, especially at the protocol or infrastructure level, involve frequent, small-value exchanges. Performing each of these as a separate on-chain transaction would be prohibitively expensive and slow. A standardized A2A Payment Channel protocol is needed to:
+*   Enable scalable and cost-effective micropayments between agents.
+*   Support automated economic incentives for protocol participation (e.g., paying relay nodes or API gateways).
+*   Provide a foundational building block for more complex payment scenarios, including application-level service payments that might opt to use these channels for settlement.
+*   Ensure interoperability for off-chain payment solutions within the agent ecosystem.
 
 ## Specification
 
-This protocol relies on NIP-1 for Agent identity and NIP-2 for secure authenticated communication channels.
-*   **NIP-1: Nuwa Agent Single DID Multi-Device Key Model**: Used for identifying User Agents and AI Agents, and for managing cryptographic keys involved in signing payment-related messages.
-*   **NIP-2: DID-Based A2A Authentication**: Used for securing the communication channel during payment negotiation and service requests, ensuring message integrity and origin authentication.
+### Scope of this NIP
 
-All messages exchanged within this payment protocol **must** be authenticated using the A2A authentication mechanism defined in NIP-2, where the `message.parts` of the A2A message would contain the specific payment protocol messages defined below.
+This NIP specifies:
+1.  The messages and procedures for establishing, funding, cooperatively updating, and closing bilateral A2A payment channels.
+2.  How these payment channels can be utilized for protocol-level payments, where User Agents or other Agents make automated or semi-automated payments for underlying infrastructure services (e.g., A2A message delivery fees, NIP-9 API Gateway usage fees).
+
+The detailed mechanisms for application-level service payments (e.g., a User Agent paying an AI Agent for a specific skill like content generation or data analysis, which typically involves service discovery, quotation, and explicit user confirmation) are considered out of scope for this NIP. Such application-specific payment flows will be defined in a separate NIP (e.g., a future NIP-X for Agent Service Payments). However, that NIP-X may optionally reference and utilize the payment channel mechanisms defined herein for settling payments for those services, especially for recurring or high-frequency service interactions with the same provider.
+
+**Interfacing with Non-A2A Services**: While this NIP defines an A2A protocol, it is recognized that payment channels may be desired with services that are not native A2A agents (e.g., traditional HTTP services). For such services to participate in NIP-4 payment channels, they would need to interact via an A2A-compatible interface. This could be achieved by the service provider running a dedicated A2A agent (or a lightweight adapter component) or by utilizing a trusted intermediary A2A gateway. The core NIP-4 protocol messages remain A2A; the specific architecture of such an interface or gateway is an implementation choice or can be further detailed in complementary documents.
+
+This protocol relies on NIP-1 for Agent identity and NIP-2 for secure authenticated communication channels for exchanging payment channel messages. It is assumed that for a given payment channel, both the Payer and Payee Agents operate with respect to a common, pre-agreed underlying blockchain or ledger system where the channel is anchored and settled. The specific on-chain mechanism (e.g., smart contract type) used on this common system is also assumed to be known or discoverable by participating agents.
 
 ### Roles
 
-*   **User Agent (Client)**: The entity requesting and paying for the AI Agent's service.
-*   **AI Agent (Service Provider)**: The entity providing the service and receiving payment.
+*   **Payer Agent**: The entity initiating payments and funding the channel. This can be any type of AI Agent (User Agent, AI Agent, etc.).
+*   **Payee Agent**: The entity receiving payments. This can also be any type of AI Agent.
 
-### Skill Advertisement and Discovery
+### Payment Channel Lifecycle
 
-AI Agents offering services for payment via this protocol should advertise their available skills in the `skills` array of their A2A Agent Card. As per the A2A specification, each element in this array is an `AgentSkill` object. The `skill_id` used in payment protocol messages (e.g., `ServiceQuotationRequest`) **must** correspond to the `id` field of one of the `AgentSkill` objects listed in the AI Agent's A2A Agent Card.
+The protocol supports one primary model for managing payments:
 
-User Agents should fetch and inspect an AI Agent's Agent Card to discover the available skills. For each skill, the User Agent will find an `AgentSkill` object, and the value of its `id` field is what should be used as the `skill_id` in payment protocol messages.
-
-For example, an AI Agent's A2A Agent Card might include a `skills` array like this:
-
-```json
-{
-  // ... other standard Agent Card fields (id, name, description, capabilities, endpoints, etc.)
-  "skills": [
-    {
-      "id": "text-generation-xl",
-      "name": "Text Generation (XL Model)",
-      "description": "Generates text using an extra-large language model.",
-      "tags": ["text", "llm", "generation"],
-      "examples": ["Write a poem about a robot learning to paint."]
-    },
-    {
-      "id": "image-analysis-v2",
-      "name": "Image Analysis Service v2",
-      "description": "Analyzes images to identify objects and scenes.",
-      "tags": ["image", "vision", "ai"],
-      "examples": ["What objects are in this picture? {image_url_or_data}"]
-    }
-    // ... other AgentSkill objects
-  ]
-  // ...
-}
-```
-A User Agent wishing to pay for the text generation service would use `"text-generation-xl"` as the `skill_id` in its `ServiceQuotationRequest`.
-
-### Payment Flow Overview
-
-The protocol supports two primary payment models:
-
-#### 1. Pre-payment Model (Per Service)
-
-This is the default model:
-
-1.  **Service Discovery & Quotation Request**: User Agent discovers an AI Agent (e.g., by resolving its DID and fetching its Agent Card), identifies a desired `skill_id` from the agent's advertised skills, and requests a quotation for that specific skill.
-2.  **Quotation Response**: AI Agent provides a signed quotation, including service details, price, and payment instructions.
-3.  **Payment Execution & Confirmation**: User Agent executes the payment and sends a signed payment confirmation (including proof of payment) to the AI Agent.
-4.  **Service Delivery**: AI Agent verifies the payment and delivers the requested service.
-5.  **Receipt (Optional)**: AI Agent issues a signed receipt for the service rendered and payment received.
-
-#### 2. State Channel Payment Model
+#### Payment Channel Model
 
 This model is suited for frequent, low-value interactions, minimizing on-chain transactions by conducting most payment updates off-chain.
 
 1.  **Channel Negotiation & Opening**:
-    *   User Agent requests to open a payment channel via `ChannelOpenRequest`.
-    *   AI Agent responds with `ChannelOpenResponse`, agreeing to terms or proposing alternatives. This includes on-chain channel contract details or multi-sig setup.
+    *   One Agent (henceforth "Payer") requests to open a payment channel with another Agent (henceforth "Payee") via `ChannelOpenRequest`.
+    *   The Payee Agent responds with `ChannelOpenResponse`, agreeing to terms or proposing alternatives. This includes on-chain channel contract details or multi-sig setup.
 2.  **Channel Funding**:
-    *   User Agent (payer) funds the channel by interacting with the agreed on-chain mechanism (e.g., deploying/funding a smart contract).
-    *   User Agent sends `ChannelFundNotification` with proof of funding.
-    *   AI Agent verifies funding and sends `ChannelActiveNotification` to confirm the channel is ready for off-chain transactions.
-3.  **Service Consumption & Off-Chain Micro-payments**:
-    *   User Agent requests a service using a standard service request, but includes a `ChannelPaymentIntent` indicating the payment will be via the channel.
-    *   AI Agent delivers the service.
-    *   AI Agent proposes an off-chain state update (e.g., new balances, sequence number) reflecting the payment for the service, signed by itself, via a `ChannelStateUpdatePropose` message.
-    *   User Agent verifies the `ChannelStateUpdatePropose`, counter-signs it, and sends it back via `ChannelStateUpdateConfirm`. This doubly-signed state is the off-chain micro-payment. Both parties retain this latest agreed state.
+    *   The Payer Agent funds the channel by interacting with the agreed on-chain mechanism (e.g., deploying/funding a smart contract).
+    *   The Payer Agent sends `ChannelFundNotification` with proof of funding.
+    *   The Payee Agent verifies funding and sends `ChannelActiveNotification` to confirm the channel is ready for off-chain transactions.
+3.  **Off-Chain Micro-payments**:
+    *   A Payer Agent (or an entity/user it represents) consumes a service or triggers a payable event from a Payee Agent (or a service it represents).
+    *   The mechanism by which this specific service consumption or event is identified as payable via the established channel depends on the nature of the service and its integration:
+        *   For native A2A protocol interactions (e.g., paying for A2A message routing or NIP-9 API gateway access), the protocol defining that interaction would specify how payment intent is signaled or implicitly understood. The Payee Agent would then initiate a `ChannelStateUpdatePropose` A2A message.
+        *   For non-A2A services (e.g., an HTTP API) interfaced via an A2A adapter/gateway, the interaction leverages HTTP headers as defined in the "HTTP Interface for Channel Payments" section below. The client's adapter sends payment channel details in the HTTP request header. The service's adapter includes the proposed channel state update (new balances, sequence number, and its signature) in the HTTP response header. This signed proposal in the HTTP response serves the role of `ChannelStateUpdatePropose` for this specific transaction.
+    *   Upon receiving the proposal (either as a direct `ChannelStateUpdatePropose` A2A message or within an HTTP response header):
+        *   The Payer Agent (or its adapter) verifies the proposed state update (e.g., confirming service delivery, amount, and the Proposer's signature).
+        *   If valid, the Payer Agent counter-signs the state. 
+            *   For direct A2A interactions, it sends a `ChannelStateUpdateConfirm` A2A message back to the Proposing Agent.
+            *   For HTTP interactions (where the proposal was received in an HTTP response header), this counter-signed state (including the Payer's signature) is included as `confirmation_data` within the `X-Payment-Channel-Data` header of the subsequent HTTP request to the service (see "HTTP Interface for Channel Payments" section).
+    *   This doubly-signed state, once the Proposing Agent receives and validates the Payer's confirmation (either via `ChannelStateUpdateConfirm` A2A message or the `confirmation_data` in a subsequent HTTP request), constitutes the off-chain micro-payment. Both parties retain this latest agreed state.
 4.  **Channel Top-up (Optional)**:
-    *   If funds are low, the User Agent can add more funds on-chain and notify the AI Agent similarly to the initial funding.
+    *   If funds are low, the Payer Agent can add more funds on-chain to the channel contract/address.
+    *   The Payer Agent then sends a `ChannelFundNotification` to the Payee Agent, with `funded_amount` specifying the amount of the top-up. The `funding_transaction_proof` would point to this new top-up transaction.
+    *   The Payee Agent verifies this additional funding on-chain.
+    *   This top-up increases the total on-chain collateral. The topped-up amount is initially considered part of the Payer's balance. Subsequent `ChannelStateUpdatePropose` messages will reflect balances based on this new, larger total collateral (see note under `ChannelStateUpdatePropose` balances).
 5.  **Channel Closure & Final Settlement**:
     *   Either party can initiate closure by sending a `ChannelCloseRequest` containing the latest mutually signed channel state.
     *   The other party acknowledges with `ChannelCloseConfirmation`.
@@ -104,343 +80,289 @@ This model is suited for frequent, low-value interactions, minimizing on-chain t
 
 ### Message Types
 
-#### 1. `ServiceQuotationRequest` (User Agent -> AI Agent)
+#### 1. `ChannelOpenRequest` (Payer Agent -> Payee Agent)
 
-*   **Purpose**: To request a price quotation for a specific skill.
-*   **Structure** (`message.parts` content):
-    ```json
-    {
-      "type": "ServiceQuotationRequest",
-      "skill_id": "unique_identifier_for_the_skill", // E.g., "text-generation-xl", "image-analysis-v2", corresponding to an entry in the Agent's A2A Agent Card skills array
-      "request_details": { ... } // Specific parameters for the skill
-    }
-    ```
-
-#### 2. `ServiceQuotationResponse` (AI Agent -> User Agent)
-
-*   **Purpose**: To provide a quotation for the requested skill. This message **must** be signed by the AI Agent's DID key.
-*   **Structure** (`message.parts` content):
-    ```json
-    {
-      "type": "ServiceQuotationResponse",
-      "skill_id": "unique_identifier_for_the_skill",
-      "quotation_id": "unique_identifier_for_this_quotation", // Generated by AI Agent
-      "price": {
-        "amount": "100", // Amount as a string to avoid precision issues
-        "currency": "0x3::gas_coin::RGas" // Or other supported currency/token identifier
-      },
-      "payment_instructions": {
-        "method": "on_chain_transfer", // e.g., "on_chain_transfer", "lightning_invoice"
-        "address": "rooch_address_of_ai_agent", // If applicable
-        "network_id": "rooch_mainnet", // If applicable
-        "memo_required": false // Optional: if a memo is needed for the transaction
-      },
-      "expires_at": "timestamp_unix_epoch", // Quotation validity
-      "state_channel_terms": { // Optional: If state channel payment is supported
-        "supported": true,
-        "supported_currencies": ["0x3::gas_coin::RGas"],
-        "min_initial_funding": {"amount": "500", "currency": "0x3::gas_coin::RGas"},
-        "on_chain_settlement_system": "RoochFrameworkChannelV1", // Identifier for the type of on-chain contract/system
-        "challenge_period_duration": "PT1H" // ISO 8601 duration, e.g., 1 hour for disputes
-      }
-    }
-    ```
-
-#### 3. `PaymentConfirmation` (User Agent -> AI Agent)
-
-*   **Purpose**: To confirm that payment has been made. This message **must** be signed by the User Agent's DID key.
-*   **Structure** (`message.parts` content):
-    ```json
-    {
-      "type": "PaymentConfirmation",
-      "quotation_id": "unique_identifier_for_this_quotation", // For single pre-payment
-      "payment_proof": {
-        "transaction_hash": "0x...", // For on-chain payments
-        "proof_details": { ... } // Other forms of proof if applicable
-      }
-    }
-    ```
-
-#### 4. `ServiceDeliveryNotification` (AI Agent -> User Agent)
-
-*   **Purpose**: To notify the User Agent that the service is being delivered or to include the service output directly if small. This message **must** be signed by the AI Agent's DID key.
-*   **Structure** (`message.parts` content):
-    ```json
-    {
-      "type": "ServiceDeliveryNotification",
-      "quotation_id": "unique_identifier_for_this_quotation",
-      "status": "success", // or "failure" with an error message
-      "service_output": { ... } // Actual service output or a reference to it
-    }
-    ```
-
-#### 5. `PaymentReceipt` (AI Agent -> User Agent, Optional)
-
-*   **Purpose**: To provide a formal receipt for the payment and service. This message **must** be signed by the AI Agent's DID key.
-*   **Structure** (`message.parts` content):
-    ```json
-    {
-      "type": "PaymentReceipt",
-      "quotation_id": "unique_identifier_for_this_quotation", // If for single pre-payment
-      "payer_did": "did:rooch:user_agent_did",
-      "payee_did": "did:rooch:ai_agent_did",
-      "amount_paid": {
-        "amount": "100",
-        "currency": "0x3::gas_coin::RGas"
-      },
-      "service_description": "Description of single service rendered",
-      "transaction_date": "timestamp_unix_epoch"
-    }
-    ```
-
-#### 6. `ChannelOpenRequest` (User Agent -> AI Agent, for State Channel Model)
-
-*   **Purpose**: User Agent proposes to open a payment channel.
+*   **Purpose**: Payer Agent proposes to open a payment channel.
 *   **Structure** (`message.parts` content):
     ```json
     {
       "type": "ChannelOpenRequest",
-      "proposed_channel_id": "unique_proposed_id_by_ua", // Temporary ID for negotiation
-      "payer_did": "did:rooch:user_agent_did",
-      "payee_did": "did:rooch:ai_agent_did",
-      "initial_funding_amount": { "amount": "1000", "currency": "0x3::gas_coin::RGas" },
-      "requested_on_chain_system": "RoochFrameworkChannelV1" // Optional: UA preference
+      "proposed_channel_id": "unique_proposed_id_by_payer", // Temporary ID for negotiation
+      "payer_did": "did:example:payer_agent_did",
+      "payee_did": "did:example:payee_agent_did",
+      "initial_funding_amount": { "amount": "1000", "currency": "USD" } // Currency as token symbol
     }
     ```
 
-#### 7. `ChannelOpenResponse` (AI Agent -> User Agent, for State Channel Model)
+#### 2. `ChannelOpenResponse` (Payee Agent -> Payer Agent)
 
-*   **Purpose**: AI Agent responds to the channel open request.
+*   **Purpose**: Payee Agent responds to the channel open request.
 *   **Structure** (`message.parts` content):
     ```json
     {
       "type": "ChannelOpenResponse",
-      "proposed_channel_id": "unique_proposed_id_by_ua", // From request
-      "channel_id": "confirmed_channel_id_by_aia", // AIA confirms or assigns a new persistent ID
+      "proposed_channel_id": "unique_proposed_id_by_payer", // From request
+      "channel_id": "confirmed_channel_id_by_payee", // Payee confirms or assigns a new persistent ID
       "status": "accepted" | "rejected" | "alternative_proposed",
-      "payer_did": "did:rooch:user_agent_did",
-      "payee_did": "did:rooch:ai_agent_did",
-      "agreed_funding_amount": { "amount": "1000", "currency": "0x3::gas_coin::RGas" }, // Can be different if negotiated
-      "on_chain_details": { // Details for on-chain interaction
-        "system_type": "RoochFrameworkChannelV1",
-        "contract_address": "0x_channel_contract_address_or_template", // Address of the specific channel contract or factory
-        "payee_on_chain_address": "rooch_address_for_aia_in_channel"
-      },
+      "payer_did": "did:example:payer_agent_did",
+      "payee_did": "did:example:payee_agent_did",
+      "agreed_funding_amount": { "amount": "1000", "currency": "USD" }, // Currency as token symbol
       "rejection_reason": "...", // If rejected
       "alternative_terms": { ... } // If alternative proposed
     }
     ```
 
-#### 8. `ChannelFundNotification` (User Agent -> AI Agent, for State Channel Model)
+#### 3. `ChannelFundNotification` (Payer Agent -> Payee Agent)
 
-*   **Purpose**: User Agent notifies that it has funded its side of the channel.
+*   **Purpose**: Payer Agent notifies that it has funded its side of the channel.
 *   **Structure** (`message.parts` content):
     ```json
     {
       "type": "ChannelFundNotification",
-      "channel_id": "confirmed_channel_id_by_aia",
+      "channel_id": "confirmed_channel_id_by_payee",
       "funding_transaction_proof": {
         "transaction_hash": "0x_funding_tx_hash",
         "network_id": "rooch_mainnet"
       },
-      "funded_amount": { "amount": "1000", "currency": "0x3::gas_coin::RGas" }
+      "funded_amount": { "amount": "1000", "currency": "USD" } // Currency as token symbol
     }
     ```
 
-#### 9. `ChannelActiveNotification` (AI Agent -> User Agent, for State Channel Model)
+#### 4. `ChannelActiveNotification` (Payee Agent -> Payer Agent)
 
-*   **Purpose**: AI Agent confirms channel funding verification and channel activation.
+*   **Purpose**: Payee Agent confirms channel funding verification and channel activation.
 *   **Structure** (`message.parts` content):
     ```json
     {
       "type": "ChannelActiveNotification",
-      "channel_id": "confirmed_channel_id_by_aia",
+      "channel_id": "confirmed_channel_id_by_payee",
       "status": "active" | "funding_issue",
       "message": "Channel is now active." // Or error message
     }
     ```
-#### 10. `ChannelPaymentIntent` (Embedded in User Agent's service request)
+#### 5. `ChannelStateUpdatePropose` (Proposing Agent -> Counterparty Agent)
 
-*   **Purpose**: To indicate that the payment for this service request will be handled via an existing state channel. This is not a standalone message but part of the service request payload sent to the AI agent.
-*   **Structure** (example, actual structure depends on the agent's service API):
-    ```json
-    // Inside the AI Agent's specific service request's params:
-    "payment_method_preference": {
-      "type": "state_channel",
-      "channel_id": "confirmed_channel_id_by_aia"
-    }
-    ```
-
-#### 11. `ChannelStateUpdatePropose` (AI Agent -> User Agent, for State Channel Model)
-
-*   **Purpose**: AI Agent proposes an off-chain state update after service delivery.
+*   **Purpose**: One agent (Proposer) proposes an off-chain state update to the other agent (Counterparty), e.g., after a metered service unit or a payment event.
 *   **Structure** (`message.parts` content):
     ```json
     {
       "type": "ChannelStateUpdatePropose",
-      "channel_id": "confirmed_channel_id_by_aia",
+      "channel_id": "confirmed_channel_id_by_payee", // Should be the agreed channel_id
       "sequence_number": 123, // Monotonically increasing
-      "balances": {
-        "user_agent_balance": "990", // Remaining balance for UA
-        "ai_agent_earned": "10"      // Amount earned by AIA in this update
+      "balances": { // Balances from the perspective of the Payer. These balances should always sum to the total acknowledged on-chain collateral (initial funding plus any acknowledged top-ups).
+        "payer_balance": "990", // Remaining balance for Payer
+        "payee_earned_total": "10" // Total amount earned by Payee in this channel up to this state
       },
-      "skill_reference_id": "id_of_skill_just_rendered", // Optional: references the skill_id or a more specific instance
-      "signature_aia": "signature_of_hash(channel_id, sequence_number, balances)_by_aia"
+      "signature_proposer": "signature_of_hash(channel_id, sequence_number, balances)_by_proposing_agent"
     }
     ```
 
-#### 12. `ChannelStateUpdateConfirm` (User Agent -> AI Agent, for State Channel Model)
+#### 6. `ChannelStateUpdateConfirm` (Counterparty Agent -> Proposing Agent)
 
-*   **Purpose**: User Agent confirms and counter-signs the state update.
+*   **Purpose**: The Counterparty Agent confirms and counter-signs the state update proposed by the Proposing Agent.
 *   **Structure** (`message.parts` content):
     ```json
     {
       "type": "ChannelStateUpdateConfirm",
-      "channel_id": "confirmed_channel_id_by_aia",
-      "sequence_number": 123, // Must match proposal
-      "balances": { // Must match proposal
-        "user_agent_balance": "990",
-        "ai_agent_earned": "10"
+      "channel_id": "confirmed_channel_id_by_payee",
+      "sequence_number": 123, 
+      "balances": { 
+        "payer_balance": "990",
+        "payee_earned_total": "10"
       },
-      "signature_ua": "signature_of_hash(channel_id, sequence_number, balances)_by_ua"
-      // The AI Agent now has a doubly-signed state (its own from proposal + this one)
+      "signature_confirmer": "signature_of_hash(channel_id, sequence_number, balances)_by_counterparty_agent"
+      // Both agents now have a doubly-signed state.
     }
     ```
 
-#### 13. `ChannelCloseRequest` (Either Agent -> Other Agent, for State Channel Model)
+#### 7. `ChannelCloseRequest` (Initiating Agent -> Other Agent)
 
-*   **Purpose**: To initiate the closure of the payment channel.
+*   **Purpose**: To initiate the closure of the payment channel by either agent.
 *   **Structure** (`message.parts` content):
     ```json
     {
       "type": "ChannelCloseRequest",
-      "channel_id": "confirmed_channel_id_by_aia",
+      "channel_id": "confirmed_channel_id_by_payee", // Should be the agreed channel_id
       "final_signed_state": { // The latest mutually agreed and signed state
         "sequence_number": 150,
         "balances": {
-          "user_agent_balance": "850",
-          "ai_agent_earned": "150"
+          "payer_balance": "850",
+          "payee_earned_total": "150"
         },
-        "signature_ua": "...",
-        "signature_aia": "..."
+        "signature_proposer": "signature_of_proposer_on_this_state", // Generalized signature
+        "signature_confirmer": "signature_of_confirmer_on_this_state" // Generalized signature
       },
       "reason": "User request" // Optional
     }
     ```
 
-#### 14. `ChannelCloseConfirmation` (Other Agent -> Initiator, for State Channel Model)
+#### 8. `ChannelCloseConfirmation` (Responding Agent -> Initiating Agent)
 
 *   **Purpose**: To acknowledge the channel close request.
 *   **Structure** (`message.parts` content):
     ```json
     {
       "type": "ChannelCloseConfirmation",
-      "channel_id": "confirmed_channel_id_by_aia",
+      "channel_id": "confirmed_channel_id_by_payee", // Should be the agreed channel_id
       "status": "acknowledged" | "disputed",
       "message": "Acknowledged. Proceeding with on-chain settlement." // Or dispute reason
     }
     ```
 
-### Detailed Flow with A2A Authentication
+### HTTP Interface for Channel Payments
 
-#### Pre-payment Model Flow
+While NIP-4 itself defines A2A messages for payment channel management, services (e.g., traditional HTTP APIs) that are not native A2A agents can participate in these payment channels via A2A-compatible interfaces (adapters/gateways). When a client interacts with such an HTTP service and wishes to pay for a specific request using an established NIP-4 payment channel, a single HTTP header, `X-Payment-Channel-Data`, is used to carry Base64 encoded JSON payloads for coordinating the payment.
 
-```mermaid
-sequenceDiagram
-    participant UA as User Agent (Client)
-    participant AIA as AI Agent (Service Provider)
+The A2A adapter on the client's side typically constructs and adds the request header. This header includes details for the current request and may also include confirmation data for a payment proposal received from a previous HTTP response. The A2A adapter on the service's side interprets the request header, processes any confirmation data, and after the service logic determines the outcome and cost for the current request, constructs and adds the response header containing a new payment proposal.
 
-    UA->>AIA: X-DID-Signature Header (NIP-2 Auth)<br>Body: ServiceQuotationRequest
-    activate AIA
-    AIA-->>UA: X-DID-Signature Header (NIP-2 Auth)<br>Body: ServiceQuotationResponse
-    deactivate AIA
+#### `X-Payment-Channel-Data` Header
 
-    UA->>UA: User Executes Payment (e.g., on-chain tx)
-    UA->>AIA: X-DID-Signature Header (NIP-2 Auth)<br>Body: PaymentConfirmation (with quotation_id, tx_hash)
-    activate AIA
-    AIA->>AIA: Verify Payment
-    AIA-->>UA: X-DID-Signature Header (NIP-2 Auth)<br>Body: ServiceDeliveryNotification (with service output)
-    deactivate AIA
+*   **Direction**: Request (Client to Service) and Response (Service to Client)
+*   **Format**: Base64 encoded JSON string.
 
-    opt Optional Receipt
-        AIA->>UA: X-DID-Signature Header (NIP-2 Auth)<br>Body: PaymentReceipt (with quotation_id)
-    end
+#### Request Payload (Client to Service)
+
+The JSON object, once Base64 decoded from the `X-Payment-Channel-Data` request header, has the following structure:
+
+```json
+{
+  "channel_id": "confirmed_channel_id_by_payee", // Required: The NIP-4 payment channel ID.
+  "max_amount": "50",                           // Optional: Max amount client authorizes for this request.
+  "currency": "USD",                           // Optional: Currency (as token symbol) for max_amount. Assumed channel currency if omitted.
+  "client_tx_ref": "client-ref-001",             // Optional: Client-generated reference for this HTTP transaction.
+  "confirmation_data": {                      // Optional: Data to confirm a previous payment proposal from the service.
+    "confirmed_sequence_number": 123,         // Required: The sequence_number of the state update being confirmed.
+    "confirmed_balances": {                   // Required: The balances being confirmed.
+      "payer_balance": "990",
+      "payee_earned_total": "10"
+    },
+    "signature_confirmer": "signature_of_hash(channel_id, confirmed_sequence_number, confirmed_balances)_by_payer_adapter" 
+                                            // Required: Payer's signature over the confirmed state.
+  }
+}
 ```
 
-#### State Channel Payment Model Flow
+#### Response Payload (Service to Client)
+
+The JSON object, once Base64 decoded from the `X-Payment-Channel-Data` response header, has the following structure. This payload contains the core elements of a `ChannelStateUpdatePropose`.
+
+```json
+{
+  "channel_id": "confirmed_channel_id_by_payee", // Required: The NIP-4 payment channel ID.
+  "sequence_number": 124,                       // Required: The new sequence number for this channel state update.
+  "balances": {                                 // Required: The new proposed balances.
+    "payer_balance": "990",
+    "payee_earned_total": "10"
+  },
+  "amount_debited": "5",                        // Required: Actual amount debited for this HTTP transaction.
+  "currency_debited": "USD",                   // Required: Currency (as token symbol) for amount_debited.
+  "service_tx_ref": "service-ref-abc",          // Optional: Service-generated reference for this transaction.
+  "signature_proposer": "signature_of_hash(channel_id, sequence_number, balances)_by_payee_adapter" 
+                                                // Required: Signature from the Payee\'s A2A adapter/gateway.
+                                                // The signature is over the canonical form of channel_id, 
+                                                // sequence_number, and balances, identical to how it\'s
+                                                // done for the ChannelStateUpdatePropose A2A message.
+}
+```
+
+**Example Flow:**
+
+1.  A User Agent wants to call an HTTP API that charges per request. An NIP-4 payment channel `channel-123` is open with the service's A2A gateway. Current agreed `sequence_number` is 123, `payer_balance` is "1000", `payee_earned_total` is "0".
+2.  The User Agent's A2A adapter prepares the request payload for the first call:
+    `{"channel_id": "channel-123", "client_tx_ref": "user-req-007"}`
+    It Base64 encodes this JSON and adds it to the `X-Payment-Channel-Data` header of the HTTP GET request to `https://api.service.com/data`.
+3.  The service's A2A gateway receives the request, decodes the `X-Payment-Channel-Data` header. The HTTP API processes the request and determines the cost is 5 units.
+4.  The service's A2A gateway prepares the response payload, including the new proposed channel state (`sequence_number: 124`, `balances: {payer_balance: "995", payee_earned_total: "5"}`), signs it to get `signature_proposer`, and other details:
+    `{"channel_id": "channel-123", "sequence_number": 124, "balances": {"payer_balance": "995", "payee_earned_total": "5"}, "amount_debited": "5", "currency_debited": "USD", "service_tx_ref": "srv-tx-456", "signature_proposer": "..."}`
+    It Base64 encodes this JSON and adds it to the `X-Payment-Channel-Data` header of the HTTP 200 OK response.
+5.  The User Agent's A2A adapter receives the HTTP response, decodes the `X-Payment-Channel-Data` header. It now has the signed proposal for state 124.
+6.  The adapter verifies `signature_proposer` against the received `channel_id`, `sequence_number` (124), and `balances`. It also checks if `amount_debited` is acceptable.
+7.  If all checks pass, the User Agent's A2A adapter prepares for the *next* HTTP request. It constructs the `confirmation_data` for state 124, including its own `signature_confirmer` for that state.
+    Let's say the next request is for another 7 units of service.
+    The request payload for the second call would be:
+    `{"channel_id": "channel-123", "client_tx_ref": "user-req-008", "confirmation_data": {"confirmed_sequence_number": 124, "confirmed_balances": {"payer_balance": "995", "payee_earned_total": "5"}, "signature_confirmer": "payer_sig_for_state_124"}}`
+    This is Base64 encoded and sent in the `X-Payment-Channel-Data` header of the next HTTP request.
+8.  The service's A2A gateway receives this second request. It first processes the `confirmation_data`:
+    *   Verifies `signature_confirmer` for state 124.
+    *   If valid, it now considers state 124 (balances: payer "995", payee "5") as mutually agreed.
+    Then, it processes the new service request (e.g., for 7 units). It prepares a new proposal for state 125:
+    `{"channel_id": "channel-123", "sequence_number": 125, "balances": {"payer_balance": "988", "payee_earned_total": "12"}, "amount_debited": "7", "currency_debited": "USD", "service_tx_ref": "srv-tx-457", "signature_proposer": "..."}`
+    This is Base64 encoded and returned in the `X-Payment-Channel-Data` header of the HTTP response.
+
+This mechanism allows HTTP services to participate in NIP-4 payment channels by embedding the payment proposal and confirmation directly within the HTTP exchange, followed by a standard A2A confirmation.
+
+### Detailed Flow with A2A Authentication
+
+#### Payment Channel Model Flow
 ```mermaid
 sequenceDiagram
-    participant UA as User Agent (Client)
-    participant AIA as AI Agent (Service Provider)
+    participant Payer as Payer Agent
+    participant Payee as Payee Agent
     participant OnChain as On-Chain Contract/Ledger
 
-    UA->>AIA: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelOpenRequest
-    activate AIA
-    AIA-->>UA: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelOpenResponse (with on-chain details)
-    deactivate AIA
+    Payer->>Payee: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelOpenRequest
+    activate Payee
+    Payee-->>Payer: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelOpenResponse (with on-chain details)
+    deactivate Payee
 
-    UA->>OnChain: Fund Channel (e.g., deploy/fund contract)
-    UA->>AIA: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelFundNotification (with tx_proof)
-    activate AIA
-    AIA->>OnChain: Verify Funding (optional, or relies on UA proof)
-    AIA-->>UA: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelActiveNotification
-    deactivate AIA
+    Payer->>OnChain: Fund Channel (e.g., deploy/fund contract)
+    Payer->>Payee: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelFundNotification (with tx_proof)
+    activate Payee
+    Payee->>OnChain: Verify Funding (optional, or relies on Payer proof)
+    Payee-->>Payer: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelActiveNotification
+    deactivate Payee
     
-    Note over UA, AIA: Channel is Active for Off-Chain Payments
+    Note over Payer, Payee: Channel is Active for Off-Chain Payments
 
-    loop Multiple Service Interactions & Off-Chain Payments
-        UA->>AIA: X-DID-Signature Header (NIP-2 Auth)<br>Body: Service Request (with ChannelPaymentIntent)
-        activate AIA
-        AIA-->>UA: X-DID-Signature Header (NIP-2 Auth)<br>Body: Service Delivery
-        AIA->>UA: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelStateUpdatePropose (AIA signs new state)
-        deactivate AIA
-        activate UA
-        UA-->>AIA: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelStateUpdateConfirm (UA counter-signs new state)
-        deactivate UA
-        Note over UA, AIA: Both parties store latest doubly-signed state
+    loop Multiple Protocol Payments & Off-Chain State Updates
+        Note over Payer, Payee: A protocol event triggers a payment
+        Note over Payer, Payee: One Agent (Proposer, e.g., Payee) initiates state update
+        Payee->>Payer: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelStateUpdatePropose (Payee signs new state as Proposer)
+        activate Payer
+        Payer-->>Payee: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelStateUpdateConfirm (Payer counter-signs new state as Counterparty)
+        deactivate Payer
+        Note over Payer, Payee: Both parties store latest doubly-signed state
     end
 
-    Note over UA, AIA: Decision to close channel (e.g., UA initiates)
-    UA->>AIA: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelCloseRequest (with final doubly-signed state)
-    activate AIA
-    AIA-->>UA: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelCloseConfirmation
-    deactivate AIA
+    Note over Payer, Payee: Decision to close channel (e.g., Payer initiates)
+    Payer->>Payee: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelCloseRequest (with final doubly-signed state)
+    activate Payee
+    Payee-->>Payer: X-DID-Signature Header (NIP-2 Auth)<br>Body: ChannelCloseConfirmation
+    deactivate Payee
 
-    UA->>OnChain: Submit Final State for Settlement
+    Payer->>OnChain: Submit Final State for Settlement
     OnChain->>OnChain: Process Settlement (handles disputes if any)
-    OnChain-->>UA: Settlement Confirmed
-    OnChain-->>AIA: Settlement Confirmed
+    OnChain-->>Payer: Settlement Confirmed
+    OnChain-->>Payee: Settlement Confirmed
 ```
 
 ### Payment Methods
 
-This protocol is designed to be extensible to various payment methods. The initial focus is on on-chain transactions (e.g., Rooch Network tokens). Other methods like Layer-2 payments (Lightning Network) or even traditional payment gateways (with appropriate tokenization of proof) could be integrated by defining new `payment_instructions` and `payment_proof` structures.
+This protocol is designed to be extensible to various payment methods for funding and settling channels. The initial focus is on on-chain transactions (e.g., Rooch Network tokens). Other methods like Layer-2 payments (Lightning Network) or even traditional payment gateways (with appropriate tokenization of proof for funding/settlement) could be integrated by defining new `on_chain_details` for `ChannelOpenResponse` and `funding_transaction_proof` structures for `ChannelFundNotification`.
 
 ## Rationale
 
-The design choices in this NIP aim to provide a flexible and secure payment framework for A2A interactions.
-*   **Two Payment Models**: Offering both a simple pre-payment model and a more complex state channel model caters to different use cases – from one-off service calls to frequent, low-latency interactions.
-*   **Extensibility**: The `payment_instructions` and `payment_proof` structures are designed to be adaptable to future payment technologies and methods beyond initial on-chain transactions.
-*   **DID-Based**: Leveraging DIDs (NIP-1) and A2A authentication (NIP-2) ensures that all payment-related communications are between authenticated parties, enhancing security and trust.
-*   **Clear Message Flow**: The defined message types and sequences aim for clarity and ease of implementation.
+The design choices in this NIP aim to provide a flexible and secure payment channel framework for A2A interactions.
+*   **Focused Payment Channel Model**: Concentrating on a payment channel model caters to use cases requiring frequent, low-latency, and low-cost micropayments, particularly for protocol-level interactions.
+*   **Extensibility**: The `on_chain_details` and `funding_transaction_proof` structures are designed to be adaptable to future payment technologies and methods for channel operations.
+*   **DID-Based**: Leveraging DIDs (NIP-1) and A2A authentication (NIP-2) ensures that all payment channel communications are between authenticated parties, enhancing security and trust.
+*   **Clear Message Flow**: The defined message types and sequences aim for clarity and ease of implementation for payment channel management.
 
 Alternative designs considered:
-*   **Single Payment Model**: Focusing only on pre-payment would simplify the NIP but would not efficiently support high-frequency, low-value transactions.
-*   **Integrated Escrow**: While escrow mechanisms are valuable, they add complexity. This NIP focuses on the foundational payment flow, with escrow being a potential future enhancement or a complementary NIP.
+*   **Including Multiple Payment Models**: While a pre-payment model is simpler for one-off transactions, separating it into a different NIP allows this NIP to focus on the complexities of payment channels and keeps each NIP more targeted.
 
 ## Backwards Compatibility
 
-This NIP introduces a new protocol for A2A service payments. It does not alter or replace any existing NIPs in a way that would cause backwards incompatibility. Agents not implementing this NIP will simply be unable to participate in these specific payment flows.
+This NIP introduces a new protocol for A2A payment channels. It does not alter or replace any existing NIPs in a way that would cause backwards incompatibility. Agents not implementing this NIP will simply be unable to participate in these specific payment channel flows.
 
 ## Test Cases
 
 Test cases are highly recommended and should cover:
-*   Successful pre-payment flow.
-*   Successful state channel lifecycle (open, fund, multiple off-chain payments, close, settle).
+*   Successful payment channel lifecycle (open, fund, multiple off-chain payments, close, settle).
 *   Handling of invalid messages (e.g., incorrect signatures, malformed JSON).
-*   Error conditions (e.g., payment verification failure, insufficient funds in channel).
-*   Dispute scenarios in state channel closure (e.g., one party submitting an old state).
-*   Quotation expiry.
+*   Error conditions (e.g., funding verification failure, insufficient funds in channel for a proposed update).
+*   Dispute scenarios in channel closure (e.g., one party submitting an old state, unresponsive party).
+*   Channel top-up scenarios.
 
 (Specific test vectors and scenarios to be detailed in a companion document or repository.)
 
@@ -451,26 +373,25 @@ A reference implementation is planned to demonstrate the protocol in action.
 
 ## Security Considerations
 
-*   **Authentication**: All payment protocol messages are wrapped within the A2A communication framework (NIP-2), ensuring that both the User Agent and AI Agent can verify the authenticity and integrity of messages.
-*   **Replay Attacks**: The `nonce` and `timestamp` mechanisms in NIP-2 protect against replay attacks for the payment messages themselves. Quotation IDs should be unique to prevent replay of old quotations. Payment confirmations should reference unique quotation IDs. Channel state updates rely on monotonically increasing sequence numbers.
-*   **Payment Verification**: AI Agents are responsible for robustly verifying the `payment_proof` (e.g., confirming transaction finality on the blockchain) before delivering the service. For state channels, on-chain verification of funding and settlement is critical.
-*   **Dispute Resolution**: This initial version does not define a formal on-protocol dispute resolution mechanism beyond the challenge periods inherent in some state channel designs. Future versions or complementary NIPs may incorporate more advanced escrow mechanisms or integration with reputation systems.
-*   **Price Fluctuation**: For volatile cryptocurrencies, the `expires_at` field in `ServiceQuotationResponse` is crucial for pre-payment. State channels may require mechanisms to adjust for significant price changes if long-lived.
-*   **State Channel Security**:
+*   **Authentication**: All payment channel protocol messages are wrapped within the A2A communication framework (NIP-2), ensuring that both participating Agents can verify the authenticity and integrity of messages.
+*   **Replay Attacks**: The `nonce` and `timestamp` mechanisms in NIP-2 protect against replay attacks for the payment messages themselves. Channel state updates rely on monotonically increasing sequence numbers to prevent replay of old states.
+*   **Payment Verification**: For channel operations, on-chain verification of funding and settlement is critical.
+*   **Dispute Resolution**: This NIP relies on the underlying on-chain channel mechanism's dispute resolution capabilities (e.g., challenge periods).
+*   **Price Fluctuation**: Long-lived channels with volatile assets may require off-chain agreement or on-chain contract mechanisms to handle significant price changes, which is outside the direct scope of this NIP but important for implementers to consider based on the chosen on-chain system.
+*   **Payment Channel Security**:
     *   **Liveness**: Participants must be online to process state updates and respond to closure requests. On-chain mechanisms are needed to handle unresponsive parties (e.g., allowing unilateral closure with the latest signed state after a challenge period).
     *   **Funding & Settlement Security**: Relies on the security of the underlying blockchain and the correctness of the channel smart contract. Audits of channel contracts are essential.
-    *   **Data Integrity**: Signatures on state updates ensure that only mutually agreed states can be settled, but parties must securely store the latest doubly-signed state.
+    *   **Data Integrity**: Signatures on state updates ensure that only mutually agreed states can be settled, but parties must securely store the latest doubly-signed state. Loss of this state by one party can be detrimental.
 
 ## 🚀 Future Considerations
 
-*   **Atomic Swaps/Escrow**: For more trustless interactions, integrating atomic swaps or smart contract-based escrow mechanisms could ensure that payment is only released upon successful service delivery.
-*   **Subscription Models**: Extending the protocol to support recurring payments for ongoing services, potentially leveraging state channels or new message types.
-*   **Usage-Based Billing**: More granular billing based on actual resource consumption (e.g., tokens processed, CPU time), especially within state channels.
-*   **Decentralized Payment Processors**: Integration with decentralized payment processing services that could abstract some of the complexities.
-*   **Reputation System**: Linking payment success/failure and service quality to a decentralized reputation system for Agents to build trust.
-*   **Multi-Currency Support**: Formalizing how multiple currencies can be negotiated and handled, especially in `ServiceQuotationResponse` and state channel agreements.
+*   **Multi-hop Payments**: Extending channels to support multi-hop payments through intermediaries.
+*   **Channel Factories**: Standardizing channel factory contracts for easier deployment.
+*   **Conditional Payments**: Integrating more complex conditional payments within channels (e.g., hash-time-locked contracts for atomic swaps via channels).
+*   **Automated Market Makers for Channel Liquidity**: Mechanisms to facilitate finding channel partners or leasing liquidity.
+*   **Cross-Chain Channels**: Specifications for payment channels that span multiple distinct blockchains.
 
-This NIP provides a foundational layer for A2A payments. Further enhancements and specific payment method integrations can be proposed in subsequent NIPs or extensions.
+This NIP provides a foundational layer for A2A payment channels. Further enhancements and specific on-chain mechanism integrations can be proposed in subsequent NIPs or extensions.
 
 ## Copyright
 
