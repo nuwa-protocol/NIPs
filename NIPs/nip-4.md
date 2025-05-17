@@ -1,16 +1,17 @@
 ---
 nip: 4
 title: A2A Agent Service Payment Protocol
+author: jolestar(@jolestar)
+discussions-to: <Link to discussion thread>
 status: Draft
 type: Standards Track
 category: Core
 created: 2025-05-13
-version: 0.1
+updated: 2025-05-17
+requires: NIP-1, NIP-2
 ---
 
-# NIP-4: A2A Agent Service Payment Protocol
-
-## 📌 Abstract
+## Abstract
 
 This NIP defines a protocol for on-demand payment for services provided by AI Agents within the Nuwa ecosystem. It builds upon NIP-1 (DID Model) and NIP-2 (A2A Authentication) to enable secure and verifiable payment transactions between a User Agent (Client) and an AI Agent (Service Provider). This protocol outlines mechanisms for pre-payment per service and a state channel model for continuous/streaming payments, where the User Agent authorizes and confirms payment.
 
@@ -18,12 +19,13 @@ This NIP defines a protocol for on-demand payment for services provided by AI Ag
 
 As AI Agents offer valuable computational services, a standardized payment mechanism is crucial for incentivizing service provision and enabling a sustainable Agent economy. This protocol aims to provide a secure, transparent, and DID-based method for User Agents to pay AI Agents for their services, ensuring that payments are tied to verifiable identities and communication is authenticated.
 
-## 🔗 Dependencies
+## Specification
 
+This protocol relies on NIP-1 for Agent identity and NIP-2 for secure authenticated communication channels.
 *   **NIP-1: Nuwa Agent Single DID Multi-Device Key Model**: Used for identifying User Agents and AI Agents, and for managing cryptographic keys involved in signing payment-related messages.
 *   **NIP-2: DID-Based A2A Authentication**: Used for securing the communication channel during payment negotiation and service requests, ensuring message integrity and origin authentication.
 
-## Protocol Details
+All messages exchanged within this payment protocol **must** be authenticated using the A2A authentication mechanism defined in NIP-2, where the `message.parts` of the A2A message would contain the specific payment protocol messages defined below.
 
 ### Roles
 
@@ -32,9 +34,9 @@ As AI Agents offer valuable computational services, a standardized payment mecha
 
 ### Skill Advertisement and Discovery
 
-AI Agents offering services for payment via this NIP-3 protocol should advertise their available skills in the `skills` array of their A2A Agent Card. As per the A2A specification, each element in this array is an `AgentSkill` object. The `skill_id` used in NIP-3 messages (e.g., `ServiceQuotationRequest`) **must** correspond to the `id` field of one of the `AgentSkill` objects listed in the AI Agent's A2A Agent Card.
+AI Agents offering services for payment via this protocol should advertise their available skills in the `skills` array of their A2A Agent Card. As per the A2A specification, each element in this array is an `AgentSkill` object. The `skill_id` used in payment protocol messages (e.g., `ServiceQuotationRequest`) **must** correspond to the `id` field of one of the `AgentSkill` objects listed in the AI Agent's A2A Agent Card.
 
-User Agents should fetch and inspect an AI Agent's Agent Card to discover the available skills. For each skill, the User Agent will find an `AgentSkill` object, and the value of its `id` field is what should be used as the `skill_id` in NIP-3 payment protocol messages.
+User Agents should fetch and inspect an AI Agent's Agent Card to discover the available skills. For each skill, the User Agent will find an `AgentSkill` object, and the value of its `id` field is what should be used as the `skill_id` in payment protocol messages.
 
 For example, an AI Agent's A2A Agent Card might include a `skills` array like this:
 
@@ -99,8 +101,6 @@ This model is suited for frequent, low-value interactions, minimizing on-chain t
     *   Either party can initiate closure by sending a `ChannelCloseRequest` containing the latest mutually signed channel state.
     *   The other party acknowledges with `ChannelCloseConfirmation`.
     *   The party initiating closure (or a pre-agreed party) submits the final mutually signed state to the on-chain channel contract for settlement. Dispute mechanisms (e.g., challenge periods) apply if there are disagreements or non-cooperation, relying on the on-chain contract logic.
-
-All messages exchanged within this protocol **must** be authenticated using the A2A authentication mechanism defined in NIP-2, where the `message.parts` would contain the specific payment protocol messages defined below.
 
 ### Message Types
 
@@ -412,27 +412,66 @@ sequenceDiagram
     OnChain-->>AIA: Settlement Confirmed
 ```
 
-### Security Considerations
-
-*   **Authentication**: All payment protocol messages are wrapped within the A2A communication framework (NIP-2), ensuring that both the User Agent and AI Agent can verify the authenticity and integrity of messages.
-*   **Replay Attacks**: The `nonce` and `timestamp` mechanisms in NIP-2 protect against replay attacks for the payment messages themselves. Quotation IDs should be unique to prevent replay of old quotations. Payment confirmations should reference unique quotation IDs.
-*   **Payment Verification**: AI Agents are responsible for robustly verifying the `payment_proof` (e.g., confirming transaction finality on the blockchain) before delivering the service.
-*   **Dispute Resolution**: This initial version does not define a formal dispute resolution mechanism. Future versions may incorporate escrow mechanisms or integration with reputation systems.
-*   **Price Fluctuation**: For volatile cryptocurrencies, the `expires_at` field in `ServiceQuotationResponse` is crucial.
-*   **State Channel Security**:
-    *   **Liveness**: Participants must be online to process state updates and respond to closure requests. On-chain mechanisms are needed to handle unresponsive parties (e.g., allowing unilateral closure with the latest signed state after a challenge period).
-    *   **Funding & Settlement Security**: Relies on the security of the underlying blockchain and the correctness of the channel smart contract.
-
 ### Payment Methods
 
 This protocol is designed to be extensible to various payment methods. The initial focus is on on-chain transactions (e.g., Rooch Network tokens). Other methods like Layer-2 payments (Lightning Network) or even traditional payment gateways (with appropriate tokenization of proof) could be integrated by defining new `payment_instructions` and `payment_proof` structures.
 
+## Rationale
+
+The design choices in this NIP aim to provide a flexible and secure payment framework for A2A interactions.
+*   **Two Payment Models**: Offering both a simple pre-payment model and a more complex state channel model caters to different use cases – from one-off service calls to frequent, low-latency interactions.
+*   **Extensibility**: The `payment_instructions` and `payment_proof` structures are designed to be adaptable to future payment technologies and methods beyond initial on-chain transactions.
+*   **DID-Based**: Leveraging DIDs (NIP-1) and A2A authentication (NIP-2) ensures that all payment-related communications are between authenticated parties, enhancing security and trust.
+*   **Clear Message Flow**: The defined message types and sequences aim for clarity and ease of implementation.
+
+Alternative designs considered:
+*   **Single Payment Model**: Focusing only on pre-payment would simplify the NIP but would not efficiently support high-frequency, low-value transactions.
+*   **Integrated Escrow**: While escrow mechanisms are valuable, they add complexity. This NIP focuses on the foundational payment flow, with escrow being a potential future enhancement or a complementary NIP.
+
+## Backwards Compatibility
+
+This NIP introduces a new protocol for A2A service payments. It does not alter or replace any existing NIPs in a way that would cause backwards incompatibility. Agents not implementing this NIP will simply be unable to participate in these specific payment flows.
+
+## Test Cases
+
+Test cases are highly recommended and should cover:
+*   Successful pre-payment flow.
+*   Successful state channel lifecycle (open, fund, multiple off-chain payments, close, settle).
+*   Handling of invalid messages (e.g., incorrect signatures, malformed JSON).
+*   Error conditions (e.g., payment verification failure, insufficient funds in channel).
+*   Dispute scenarios in state channel closure (e.g., one party submitting an old state).
+*   Quotation expiry.
+
+(Specific test vectors and scenarios to be detailed in a companion document or repository.)
+
+## Reference Implementation
+
+A reference implementation is planned to demonstrate the protocol in action.
+*   Links to the reference implementation(s) will be added here once available.
+
+## Security Considerations
+
+*   **Authentication**: All payment protocol messages are wrapped within the A2A communication framework (NIP-2), ensuring that both the User Agent and AI Agent can verify the authenticity and integrity of messages.
+*   **Replay Attacks**: The `nonce` and `timestamp` mechanisms in NIP-2 protect against replay attacks for the payment messages themselves. Quotation IDs should be unique to prevent replay of old quotations. Payment confirmations should reference unique quotation IDs. Channel state updates rely on monotonically increasing sequence numbers.
+*   **Payment Verification**: AI Agents are responsible for robustly verifying the `payment_proof` (e.g., confirming transaction finality on the blockchain) before delivering the service. For state channels, on-chain verification of funding and settlement is critical.
+*   **Dispute Resolution**: This initial version does not define a formal on-protocol dispute resolution mechanism beyond the challenge periods inherent in some state channel designs. Future versions or complementary NIPs may incorporate more advanced escrow mechanisms or integration with reputation systems.
+*   **Price Fluctuation**: For volatile cryptocurrencies, the `expires_at` field in `ServiceQuotationResponse` is crucial for pre-payment. State channels may require mechanisms to adjust for significant price changes if long-lived.
+*   **State Channel Security**:
+    *   **Liveness**: Participants must be online to process state updates and respond to closure requests. On-chain mechanisms are needed to handle unresponsive parties (e.g., allowing unilateral closure with the latest signed state after a challenge period).
+    *   **Funding & Settlement Security**: Relies on the security of the underlying blockchain and the correctness of the channel smart contract. Audits of channel contracts are essential.
+    *   **Data Integrity**: Signatures on state updates ensure that only mutually agreed states can be settled, but parties must securely store the latest doubly-signed state.
+
 ## 🚀 Future Considerations
 
 *   **Atomic Swaps/Escrow**: For more trustless interactions, integrating atomic swaps or smart contract-based escrow mechanisms could ensure that payment is only released upon successful service delivery.
-*   **Subscription Models**: Extending the protocol to support recurring payments for ongoing services.
-*   **Usage-Based Billing**: More granular billing based on actual resource consumption (e.g., tokens processed, CPU time).
-*   **Decentralized Payment Processors**: Integration with decentralized payment processing services.
-*   **Reputation System**: Linking payment success/failure and service quality to a decentralized reputation system for Agents.
+*   **Subscription Models**: Extending the protocol to support recurring payments for ongoing services, potentially leveraging state channels or new message types.
+*   **Usage-Based Billing**: More granular billing based on actual resource consumption (e.g., tokens processed, CPU time), especially within state channels.
+*   **Decentralized Payment Processors**: Integration with decentralized payment processing services that could abstract some of the complexities.
+*   **Reputation System**: Linking payment success/failure and service quality to a decentralized reputation system for Agents to build trust.
+*   **Multi-Currency Support**: Formalizing how multiple currencies can be negotiated and handled, especially in `ServiceQuotationResponse` and state channel agreements.
 
 This NIP provides a foundational layer for A2A payments. Further enhancements and specific payment method integrations can be proposed in subsequent NIPs or extensions.
+
+## Copyright
+
+Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
