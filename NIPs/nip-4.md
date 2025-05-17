@@ -122,7 +122,6 @@ This model is suited for frequent, low-value interactions, minimizing on-chain t
       "channel_id": "confirmed_channel_id_by_payee",
       "funding_transaction_proof": {
         "transaction_hash": "0x_funding_tx_hash",
-        "network_id": "rooch_mainnet"
       },
       "funded_amount": { "amount": "1000", "currency": "USD" } // Currency as token symbol
     }
@@ -338,7 +337,7 @@ sequenceDiagram
 
 ### Payment Methods
 
-This protocol is designed to be extensible to various payment methods for funding and settling channels. The initial focus is on on-chain transactions (e.g., Rooch Network tokens). Other methods like Layer-2 payments (Lightning Network) or even traditional payment gateways (with appropriate tokenization of proof for funding/settlement) could be integrated by defining new `on_chain_details` for `ChannelOpenResponse` and `funding_transaction_proof` structures for `ChannelFundNotification`.
+This protocol is designed to be extensible to various payment methods for funding and settling channels. The initial focus is on on-chain transactions. Other methods like Layer-2 payments (Lightning Network) or even traditional payment gateways (with appropriate tokenization of proof for funding/settlement) could be integrated by defining new `on_chain_details` for `ChannelOpenResponse` and `funding_transaction_proof` structures for `ChannelFundNotification`.
 
 ## Rationale
 
