@@ -1,16 +1,17 @@
 ---
 nip: 7
 title: Agent Capability Protocol — Capability Package Specification
+author: jolestar(@jolestar)
+discussions-to: <URL of GitHub issue or discussion thread>
 status: Draft
 type: Standards Track
 category: Core
 created: 2025-05-13
-version: 0.1
+updated: 2025-05-18
+requires: NIP-1
 ---
 
-# NIP-7: Agent Capability Protocol — Capability Package Specification
-
-## 0  Summary
+## Abstract
 
 *Agent Capability Protocol* (ACP) defines how an **Agent Capability Package** (file suffix **`.acp.yaml`**) bundles:
 
@@ -22,9 +23,7 @@ version: 0.1
 A single ACP file can be published to a decentralised **Capability Registry**, discovered by any Nuwa-compatible Router, installed at runtime, and cleanly removed or upgraded.
 State persistence is performed via the standard `state.*` tool family provided by the Nuwa runtime.
 
----
-
-## 1  Motivation
+## Motivation
 
 Current agents are monolithic: a huge prompt plus ad-hoc tools. Scaling to dozens of tasks explodes context size and tangles memory. ACP makes each task a plug-in that can be:
 
@@ -33,9 +32,9 @@ Current agents are monolithic: a huge prompt plus ad-hoc tools. Scaling to dozen
 * **independently versioned & governed**,
 * **securely sandboxed** with least-privilege storage calls.
 
----
+## Specification
 
-## 2  Terminology
+### Terminology
 
 | Term               | Meaning                                                                      |
 | ------------------ | ---------------------------------------------------------------------------- |
@@ -45,11 +44,9 @@ Current agents are monolithic: a huge prompt plus ad-hoc tools. Scaling to dozen
 | **Router**         | Top-level agent component that routes messages to sub-agents (capabilities). |
 | **Registry**       | Decentralised index (chain + IPFS) that stores ACP metadata & file CIDs.     |
 
----
+### File format (`.acp.yaml`)
 
-## 3  File format (`.acp.yaml`)
-
-### 3.1  Top-level sections
+#### Top-level sections
 
 ```yaml
 metadata:       | required | ACP & trigger info, including optional LLM requirements
@@ -59,7 +56,7 @@ tools:          | optional | Tool list (YAML array, OpenAI format) - Interface f
 tool_bindings:  | optional | Defines execution for non-built-in tools - Implementation for Runtime
 ```
 
-### 3.2  Minimal example
+#### Minimal example
 
 ```yaml
 # ========= Agent Capability Package =========
@@ -151,7 +148,7 @@ tool_bindings:
 # ========= End of ACP =========
 ```
 
-### 3.3  Field rules
+#### Field rules
 
 | Field         | Rule                                                                              |
 | ------------- | --------------------------------------------------------------------------------- |
@@ -161,9 +158,7 @@ tool_bindings:
 | `metadata.llm_requirements` | Optional. An object specifying dependencies on LLM models or features. Fields can include `model_family` (array of strings, e.g., "gpt-4", "claude-2"), `specific_model_uri` (string, e.g., a DID or URL pointing to a specific model), `min_context_window` (integer), `required_features` (array of strings, e.g., "function_calling_json_mode"). The Router SHOULD attempt to satisfy these requirements if specified. |
 | `signature`   | Author signs `sha256(file)` with a key in their DID Document.                     |
 
----
-
-### 3.4 Tool Bindings (`tool_bindings`)
+#### Tool Bindings (`tool_bindings`)
 
 The optional `tool_bindings` section provides the Nuwa runtime with instructions on how to execute tools declared in the `tools` section that are not built-in (e.g., `state.*` family). If a tool declared in `tools` is not a built-in and does not have a corresponding entry in `tool_bindings`, the runtime may not be able to execute it.
 
@@ -249,9 +244,7 @@ tool_bindings:
 # ========= End of ACP =========
 ```
 
----
-
-## 4  Runtime behaviour
+### Runtime behaviour
 
 1.  **Install**
 
@@ -277,9 +270,7 @@ tool_bindings:
 
    * If tool response contains `{"done":true}` *or* Router times out / re-classifies, stack pops.
 
----
-
-## 5  Built-in storage tools (`state.*`)
+### Built-in storage tools (`state.*`)
 
 | Tool           | Purpose            | Notes                                |
 | -------------- | ------------------ | ------------------------------------ |
@@ -291,24 +282,22 @@ tool_bindings:
 A capability MUST declare required CRUD verbs in `metadata.permissions.require`.
 The detailed mechanics of state persistence, `memory_scope` isolation, and the issuance of permission tokens (e.g., ZCAP-LD) for these tools may be further elaborated in a dedicated NIP.
 
----
-
-## 6  Registry Interaction Model
+### Registry Interaction Model
 
 The Capability Registry system facilitates the discovery and resolution of ACPs.
 **Publishing** new capabilities or versions is a **client-side action** involving direct interaction with the underlying blockchain. This action results in on-chain events.
 **Discovery and Resolution** are handled by Registry Indexing Services, which listen to these on-chain events, fetch ACP files from IPFS, and build a searchable index. These services SHOULD expose their query functionalities via the **Model Context Protocol (MCP)**.
 
-### 6.1 Client-Side Publishing Actions
+#### Client-Side Publishing Actions
 
 | Action                | Description                                                                 | Initiator         |
 | --------------------- | --------------------------------------------------------------------------- | ----------------- |
 | `Publish New Version` | Client-side action: package ACP, sign, upload to IPFS, and submit essential registration data (specifically `cap_uri`, `semver`, `cid` of the ACP file on IPFS, and `sha256` hash of the ACP file) to the blockchain. Requires DID authentication by the author. The full ACP YAML is stored on IPFS, not directly on-chain. | Client (e.g., CLI)|
-| `Vote on Capability`  | Client-side action: submit a vote related to a capability's governance to a relevant smart contract. (Optional DAO model). | Client (e.g., CLI)|
+| `Vote on Capability`  | Client-side action: submit a vote related to a capability\'s governance to a relevant smart contract. (Optional DAO model). | Client (e.g., CLI)|
 
 On-chain implementations (e.g., the `acp-registry-contract`) MUST store at least the `cap_uri`, `semver`, `cid` (Content Identifier for the ACP file on IPFS), and `sha256` (hash of the ACP file for integrity verification). Upon successful publication of a new capability version, the contract MUST emit an event containing these four pieces of information.
 
-### 6.2 Registry MCP Service Interface (for Discovery & Resolution)
+#### Registry MCP Service Interface (for Discovery & Resolution)
 
 Registry Indexing Services provide an MCP interface for clients to find and retrieve ACP information. Example MCP actions include:
 
@@ -319,27 +308,34 @@ Registry Indexing Services provide an MCP interface for clients to find and retr
 
 Clients would use an SDK to make authenticated (if required by the MCP service, per NIP-6) calls to these MCP actions. The `acp_metadata` in the output would typically be the `metadata` section of the ACP YAML.
 
----
+## Rationale
 
-## 7  Security considerations
+This section explains the "why" behind the design choices in the "Specification" section.
+*   Alternative designs considered and why they were not chosen.
+*   Related work or prior art.
+*   Evidence of community consensus or address significant objections.
+
+(To be defined)
+
+## Backwards Compatibility
+
+Monolithic agents (pre-ACP) remain functional: Router falls back when no capability is triggered.
+Schema version upgrades follow SemVer; incompatible changes require new `Schema URI`.
+
+## Test Cases
+
+
+## Reference Implementation
+
+<!-- placeholder for a link to the reference implementation (e.g., a GitHub repository or branch) -->
+
+## Security Considerations
 
 * **Signature validation** — Router MUST reject unsigned or invalid packages.
 * **Sand-boxing** — Tool invocations run in WASM / container with least privilege.
 * **Permission tokens** — Runtime issues ZCAP-LD (Authorization Capabilities for Linked Data, a decentralized authorization standard) tokens scoped to `memory_scope`.
 * **Prompt-injection** — Router SHOULD lint `prompt` for forbidden patterns before mounting.
 
----
+## Copyright
 
-## 8  Backwards compatibility
-
-Monolithic agents (pre-ACP) remain functional: Router falls back when no capability is triggered.
-Schema version upgrades follow SemVer; incompatible changes require new `Schema URI`.
-
----
-
-## 9  Reference implementation
-
-* `acp-cli` — pack / sign / publish utility (Rust). Handles client-side interaction with IPFS and the blockchain for publishing.
-* `acp-router` — TypeScript runtime with stack switching & OpenAI tool calls. Interacts with Registry MCP services for discovery.
-* `acp-registry-contract` — Smart Contract on chain anchoring `(cap_uri, semver, cid, hash)` and emitting events for indexers.
-* `acp-registry-indexer` — An MCP service that listens to on-chain events, fetches/caches ACPs from IPFS, indexes their metadata, and provides the MCP interface (e.g., `resolve_capability`, `search_capabilities`) for discovery.
+Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
