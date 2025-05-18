@@ -11,18 +11,18 @@ created: 2024-05-12
 
 ## Abstract
 
-This NIP proposes a foundational decentralized identity model for Agents (representing users, services, or other autonomous entities) within the ecosystem. It enables a single master Decentralized Identifier (DID) to manage multiple operational keys (e.g., device-specific keys or service instance keys). The model aims to ensure consistent and verifiable identities, key isolation, permission control, and secure revocability. The model supports various DID methods (which could be anchored to different Verifiable Data Registries, including blockchains) presented as potential examples for anchoring DID documents.
+This NIP proposes a foundational decentralized identity model for Agents (representing users, services, or other autonomous entities) within the ecosystem. It enables a single master Decentralized Identifier (DID) to manage multiple operational keys (e.g., device-specific keys, application-specific keys, or service instance keys). The model aims to ensure consistent and verifiable identities, key isolation, permission control, and secure revocability across multiple devices and application contexts. The model supports various DID methods (which could be anchored to different Verifiable Data Registries, including blockchains) presented as potential examples for anchoring DID documents.
 
 ## Motivation
 
-To establish a consistent and secure identity framework for all participating entities (Agents, including users and service providers) within the ecosystem, a standardized approach to DID management is needed. This NIP defines a decentralized identity model based on a **"single master identity + multiple operational sub-keys"** concept. This allows an Agent, whether an end-user managing multiple devices or a service provider managing different operational instances or keys, to operate under a unified DID. It aims to provide a robust and flexible identity foundation for Agents in the ecosystem, enabling secure interactions and verifiable claims without compromising core digital identities or creating identity fragmentation.
+To establish a consistent and secure identity framework for all participating entities (Agents, including users and service providers) within the ecosystem, a standardized approach to DID management is needed. This NIP defines a decentralized identity model based on a **"single master identity + multiple operational sub-keys"** concept. This allows an Agent, whether an end-user managing multiple devices and applications, or a service provider managing different operational instances or keys, to operate under a unified DID. It aims to provide a robust and flexible identity foundation for Agents in the ecosystem, enabling secure interactions and verifiable claims without compromising core digital identities or creating identity fragmentation across various devices and application environments.
 
 ## Specification
 
 ### Core Design Principles
 
 -   **Single Master Identity**: Each Agent possesses a master DID (e.g., any DID compliant with W3C DID specifications, such as `did:example:123`; for implementations on a specific network, like `did:<method>:<entity1>`), representing their unique digital persona or service identity and associated digital assets/memories/configurations. Control over this DID is held by one or more Master Key(s).
--   **Multi-Device/Operational Keys**: Each Agent instance or distinct operational context (e.g., a specific device, a service replica, a temporary session) generates or is assigned a local Key (referred to broadly as a "Device Key" in examples for simplicity, but can represent any operational sub-key).
+-   **Multi-Device/Application/Operational Keys**: Each Agent instance or distinct operational context (e.g., a specific device, a specific application instance on a device, a service replica, a temporary session) generates or is assigned a local Key (referred to broadly as an "Operational Key" or sometimes "Device Key" or "Application Key" in examples for simplicity, but can represent any operational sub-key).
 -   **DID Document Registration**: The public key information of each such Key is registered as a `verificationMethod` entry in the DID document associated with the master DID.
 -   **Fine-grained Verification Relationships**: By adding the `id` of a `verificationMethod` to different verification relationships (e.g., `authentication`, `assertionMethod`, `capabilityInvocation`, `capabilityDelegation`), the permission scope of each key can be precisely controlled.
 -   **Signatures Indicate Origin**: All signature operations initiated by an Agent using one of its keys must clearly indicate which key was used (via the `id` of the `verificationMethod`).
@@ -169,21 +169,21 @@ Recommended strategies:
 
 ### Device/Operational Key Registration / Update Protocol (Draft)
 
-This section outlines a high-level protocol for adding a new operational key to the DID document.
+This section outlines a high-level protocol for adding a new operational key (for a device, application, or other operational context) to the DID document.
 
-**Participants:** Agent (User or Service Admin), New Instance/Device, Authorizing Instance/Device/Mechanism, Controller/Management Service, VDR.
+**Participants:** Agent (User or Service Admin), New Instance/Device/Application, Authorizing Instance/Device/Mechanism, Controller/Management Service, VDR.
 
-**Protocol Flow (Example: Authentication via an Authorized Key/Device):**
-1.  **[New Instance/Device] Key Generation**: Generates `newPubKey`, `newPrivKey`.
-2.  **[New Instance/Device → Controller] Initiate Registration Request**: Sends `targetDid`, `newPubKey`, desired relationships, `requestNonce`, `requestTimestamp`.
+**Protocol Flow (Example: Authentication via an Authorized Key/Device/Application):**
+1.  **[New Instance/Device/Application] Key Generation**: Generates `newPubKey`, `newPrivKey`.
+2.  **[New Instance/Device/Application → Controller] Initiate Registration Request**: Sends `targetDid`, `newPubKey`, desired relationships, `requestNonce`, `requestTimestamp`.
 3.  **[Controller] Generate Authorization Challenge**: Creates `authChallenge`.
-4.  **[Controller → New Instance/Device] Return Authorization Challenge**.
-5.  **[New Instance/Device → Agent] Request Agent Authorization**: Presents request (e.g., QR code, admin approval flow).
+4.  **[Controller → New Instance/Device/Application] Return Authorization Challenge**.
+5.  **[New Instance/Device/Application → Agent] Request Agent Authorization**: Presents request (e.g., QR code, admin approval flow).
 6.  **[Agent @ Authorizing Instance/Mechanism] Authorize**: Agent confirms (e.g., on an authorized device, via an admin interface).
 7.  **[Authorizing Instance/Mechanism → Controller] Sign and Send Authorization Proof**: Signs `authChallenge` with its authorized key, sends `authProof`.
 8.  **[Controller] Verify Authorization and Update VDR**: Verifies `authProof`, constructs VDR update transaction, submits to VDR.
 9.  **[VDR] Process Transaction**.
-10. **[Controller → New Instance/Device] Return Result**.
+10. **[Controller → New Instance/Device/Application] Return Result**.
 
 *(Security considerations for this protocol are detailed in the "Security Considerations" section below).*
 
