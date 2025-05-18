@@ -31,29 +31,43 @@ The Nuwa Improvement Proposals (NIPs) detailed in this repository represent the 
 
 ```mermaid
 graph TD
-    U[Users / Applications] --> NA[Nuwa-Enabled AI Agent]
+    U1["User Device/App 1"]
+    U2["User Device/App 2"]
+    U3["User Device/App 3"]
 
-    subgraph NA[Nuwa-Enabled AI Agent]
-        L0[Core Agent Logic]
-        L1[**Identity & Security** <br/> NIP-1 (DID), NIP-2 (Auth) <br/> NIP-3 (Custodian Onboarding)]
-        L2[**State & Capabilities** <br/> NIP-6 (Sync), NIP-8 (State Model) <br/> NIP-7 (Capabilities)]
-        L3[**Interaction & Payments** <br/> NIP-4 (A2A Channels), NIP-11 (Service Pay) <br/> NIP-5 (Fiat Proxy), NIP-9 (LLM Gateway) <br/> NIP-10 (MCP Ext.)]
+    subgraph NA["Your AI Agent DID"]
+        style NA fill:#e6f7ff,stroke:#0077cc,stroke-width:2px
+        AgentCore["Agent Logic & Capabilities"] 
+        AgentIdentity["Identity Layer<br>(DID, Auth)"]
+        AgentState["**Shared State**<br>(CRDT, Agent State Model)"]
+        AgentPayments["Payments & External<br>(A2A Channels,LLM Gateway)"]
 
-        L0 --> L1
-        L0 --> L2
-        L0 --> L3
+        AgentCore --> AgentIdentity
+        AgentCore --> AgentState
+        AgentCore --> AgentPayments
     end
 
-    L3 --> ES[External Services <br/> (Other Agents, LLMs, Fiat, MCP Services)]
+    U1 -->|Accesses| AgentCore
+    U2 -->|Accesses| AgentCore
+    U3 -->|Accesses| AgentCore
 
-    %% Styling for better readability in Markdown
-    classDef component fill:#fff,stroke:#333,stroke-width:1.5px,color:black
-    classDef agent_boundary fill:#f0f8ff,stroke:#4682b4,stroke-width:2px,rx:5,ry:5
-    classDef layer_heading font-weight:bold
+    AgentState -. Synchronized State .-> U1
+    AgentState -. Synchronized State .-> U2
+    AgentState -. Synchronized State .-> U3
 
-    class U,ES,L0 component
-    class NA agent_boundary
-    class L1,L2,L3 layer_heading
+    AgentPayments --> ES["External Services<br>(Agents, LLMs, Fiat, MCPs)"]
+
+    %% Styling
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px
+    classDef agent fill:#e6f7ff,stroke:#0077cc,stroke-width:2px,rx:5,ry:5
+    classDef agent_component fill:#d1eafb,stroke:#005fa3,stroke-width:1.5px
+    classDef user_app fill:#e0ffe0,stroke:#006400,stroke-width:1.5px
+    classDef external_service fill:#ffe0e0,stroke:#a00000,stroke-width:1.5px
+
+    class NA agent
+    class AgentCore,AgentIdentity,AgentState,AgentPayments agent_component
+    class U1,U2,U3 user_app
+    class ES external_service
 ```
 
 ## Process
