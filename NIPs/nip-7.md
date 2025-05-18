@@ -281,6 +281,7 @@ tool_bindings:
 
 A capability MUST declare required CRUD verbs in `metadata.permissions.require`.
 The detailed mechanics of state persistence, `memory_scope` isolation, and the issuance of permission tokens (e.g., ZCAP-LD) for these tools may be further elaborated in a dedicated NIP.
+State schemas defined within ACPs MUST conform to the Agent State Model (ASM) as specified in NIP-8. This includes the use of `x-asm` annotations for CRDT policies, lifecycle, and visibility where applicable.
 
 ### Registry Interaction Model
 
