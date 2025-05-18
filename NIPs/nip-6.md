@@ -1,26 +1,27 @@
 ---
 nip: 6
 title: Agent Multi-Device State Synchronization
+author: jolestar(@jolestar)
+discussions-to: <Please provide URL of the discussion thread>
 status: Draft
 type: Standards Track
 category: Core
 created: 2025-05-13
-version: 0.1
+updated: 2025-05-18
+requires: NIP-1, NIP-2, NIP-3
 ---
 
-# NIP-6: Agent Multi-Device State Synchronization
-
-**Status:** Draft
-
-**Abstract**
+## Abstract
 
 This NIP defines a peer-to-peer (P2P) protocol for synchronizing an agent's state across multiple devices. This allows an agent to maintain a consistent state and operate seamlessly regardless of which device is currently in use. The protocol aims to support nested JSON schema-like data structures, multi-platform compatibility, offline operation with eventual consistency, and optional end-to-end privacy.
 
-**Motivation**
+## Motivation
 
 Users often interact with agents from various devices (desktop, mobile, web). A robust synchronization mechanism is crucial to ensure that the agent's knowledge, capabilities, and context are consistent across all these devices. This NIP builds upon existing NIPs for identity (NIP-1), authentication (NIP-2), and payments (NIP-3) to provide a comprehensive solution.
 
-**Core Concepts**
+## Specification
+
+### Core Concepts
 
 1.  **Agent Identity**: Each agent is uniquely identified by its DID (as defined in NIP-1). All devices associated with an agent share this common identity. The DID document lists authorized device public keys, which are crucial for verifying the authenticity of discovery messages and synchronization updates.
 2.  **Device Identity & Authorization**:
@@ -53,16 +54,12 @@ Users often interact with agents from various devices (desktop, mobile, web). A 
     *   **State Exchange**: Once connected, devices will exchange their CRDT state. CRDTs inherently handle the merging of different versions of the state.
     *   **Delta Updates**: After the initial sync, devices will only transmit changes (deltas) to the state to minimize bandwidth usage. Libraries like Yjs and Automerge support this.
     *   **Gossip Protocol**: Updates can be propagated through the network of connected peers using a gossip-like mechanism to ensure all devices eventually receive all updates.
-7.  **Data Integrity and Security**:
-    *   All state updates should be signed by the originating device's key to ensure authenticity and integrity.
-    *   End-to-end encryption of state data in transit and potentially at rest on the devices.
-    *   **Identity and Key Management**: Leverage NIP-1 for agent DID. For device-level keys and potential shared state encryption keys, mechanisms like GUN SEA's key pairs or a protocol for securely deriving/sharing keys (e.g., from a master password or via trusted device authorization) are needed.
-8.  **Offline Support and Resilience**:
+7.  **Offline Support and Resilience**: (Moved to its own sub-section under Specification for clarity, as it's a key feature)
     *   Devices should be able to operate offline and accumulate state changes.
     *   When a device reconnects, it will sync its changes with its peers.
     *   The system should be resilient to devices frequently joining and leaving the network.
 
-**Detailed Protocol (To be elaborated)**
+### Detailed Protocol
 
 *   **Device Authorization Flow**: This flow enables a new device to participate in state synchronization. It leverages the device key registration process defined in NIP-1 and adds steps for securely sharing synchronization-specific secrets.
     *   **1. Device Key Generation & Initial Registration (Leveraging NIP-1)**:
@@ -98,7 +95,6 @@ Users often interact with agents from various devices (desktop, mobile, web). A 
         *   **API**: Simple registration and lookup (by `AgentDID`, returning a list of signed device records).
     *   **4. Discovery via Synchronization Layer (If Applicable)**
         *   **Function**: Some chosen synchronization layers (e.g., Matrix, libp2p with specific discovery modules, OrbitDB/IPFS) provide their own peer discovery mechanisms.
-        *   **Mechanism**: If such a layer is used, its native discovery (e.g., joining a Matrix room derived from AgentDID, using libp2p's DHT/mDNS modules, IPFS PubSub) can be the primary method for finding peers already part of that sync ecosystem.
         *   **Verification**: Still relies on NIP-1 DIDs to verify that discovered peers are legitimate devices of the agent.
     *   **Order of Operations & Bootstrapping Strategy**:
         *   A device typically attempts discovery in the following order:
@@ -118,24 +114,48 @@ Users often interact with agents from various devices (desktop, mobile, web). A 
     *   Delta updates are crucial.
     *   Lazy loading or partial synchronization for very large states (see Open Questions).
 
-**Recommended Technologies/Approaches (Summary from Research)**
+## Rationale
 
-*   **State Model (CRDTs)**: **Automerge** or **Yjs** for their support of nested structures and automatic conflict merging.
-*   **Synchronization Layer**:
-    *   **GunDB**: For lightweight needs and ease of use.
-    *   **OrbitDB**: For decentralized persistence leveraging IPFS.
-    *   **Matrix**: For high-security needs and robust E2EE messaging infrastructure.
-*   **Identity Mechanism**: NIP-1 DID for agent identity. For device and data encryption, consider **GUN SEA** principles or a custom secure key derivation/sharing protocol.
-*   **Key Synchronization**: A self-implemented secure key backup and recovery protocol, or leveraging secure channels provided by a sync layer like Matrix.
-*   **Optional Backup Layer**: **Syncthing** could be considered for file-level snapshotting and backup of the agent state, operating independently or as a complement to the CRDT sync.
+*(Placeholder: To be filled in with design choices, alternatives considered, and community consensus.)*
 
-**Open Questions/Future Considerations**
+## Backwards Compatibility
 
-*   Scalability to a very large number of devices per agent.
-*   Selective synchronization (e.g., syncing only a subset of the state to resource-constrained devices or based on user preference).
-*   Interoperability between different CRDT implementations if agents need to use diverse state models.
-*   Mechanisms for revoking device authorization securely and efficiently propagating this revocation.
-*   Defining a robust and secure protocol for initial key sharing and ongoing key synchronization/recovery across devices.
-*   Choosing the right balance between decentralization, performance, and ease of implementation for the synchronization layer (GunDB vs. OrbitDB vs. Matrix vs. custom).
-*   Integration strategy for an optional backup layer like Syncthing: how it interacts with the live CRDT state.
-*   Formal specification of the schemas for common agent state components.
+*(Placeholder: To be filled in. This NIP defines a new protocol, so initial implementations would not have backwards compatibility issues with older versions of this specific protocol. Compatibility with other NIPs like NIP-1, NIP-2, NIP-3 is by design.)*
+
+## Test Cases
+
+*(Placeholder: To be filled in with specific test cases for device authorization, peer discovery, state synchronization, conflict resolution with CRDTs, offline operation, and security checks.)*
+
+## Reference Implementation
+
+*(Placeholder: To be provided once a reference implementation is available.)*
+
+## Security Considerations
+
+The security of this NIP relies heavily on the underlying NIPs for identity (NIP-1) and authentication (NIP-2).
+
+*   **Data Integrity and Authenticity**:
+    *   All state updates should be signed by the originating device's key (as registered in the Agent's DID document per NIP-1) to ensure authenticity and integrity. This prevents unauthorized modifications and allows peers to verify the source of updates.
+    *   CRDTs themselves do not inherently provide authentication, so signatures are a crucial layer on top.
+*   **End-to-End Encryption**:
+    *   All P2P communication for state synchronization must be end-to-end encrypted using keys derived during the device authorization/authentication phase (potentially leveraging NIP-2 mechanisms or a shared secret established during device onboarding).
+    *   State data should be encrypted at rest on devices, using device-specific encryption or encryption derived from the shared agent secrets.
+*   **Device Authorization and Key Management**:
+    *   The "Device Authorization Flow" is critical. Secure transfer of synchronization secrets (e.g., an agent-specific `epriv` for CRDT data) is paramount. This process must be protected against man-in-the-middle attacks.
+    *   Revocation of device keys (as per NIP-1) must effectively prevent a compromised or decommissioned device from participating in synchronization or accessing future state.
+*   **Peer Discovery Security**:
+    *   In all peer discovery mechanisms (Local, DHT, Rendezvous Server), announcements and registrations must be signed by the device's key.
+    *   Peers must verify these signatures against the public keys listed in the Agent's DID document (NIP-1) before establishing a connection or accepting state from them. This prevents impersonation of legitimate devices.
+    *   Rendezvous servers, if used, should be treated as untrusted introducers; the trust is established end-to-end between devices via signature verification.
+*   **CRDT-Specific Considerations**:
+    *   While CRDTs resolve conflicts automatically, malicious or malformed CRDT operations could potentially disrupt state or lead to excessive data growth. Input validation and potentially sandboxing CRDT operations might be necessary depending on the chosen CRDT library and its properties.
+*   **Denial of Service**:
+    *   Peer discovery mechanisms (especially public ones like DHTs or rendezvous servers) could be susceptible to DoS attacks (e.g., flooding with fake announcements). Rate limiting, verifiable claims, and potentially small proofs-of-work could be considered for mitigation if this becomes an issue.
+    *   Synchronization itself could be a vector if a malicious peer attempts to send excessive or malformed data.
+*   **Privacy**:
+    *   While E2EE protects data in transit, metadata (e.g., which devices are online, frequency of sync) might still be observable by entities facilitating peer discovery if not carefully designed (e.g., a centralized rendezvous server).
+    *   The content of the synchronized state itself should be considered sensitive.
+
+## Copyright
+
+Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
