@@ -6,7 +6,7 @@ discussions-to: <URL of the discussion thread>
 status: Draft
 type: Standards Track
 category: Agent
-created: 2025-05-18
+created: 2025-05-15
 updated: 2025-05-18
 requires: NIP-1, NIP-2, NIP-4, NIP-5
 ---
