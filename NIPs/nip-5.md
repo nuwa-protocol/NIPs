@@ -1,17 +1,19 @@
 ---
 nip: 5
 title: Fiat-Proxy Top-Up Protocol (FPTP)
+author: jolestar(@jolestar)
+discussions-to: <URL of the discussion thread> # To be filled
 status: Draft
-type: Standards Track — Payments
+type: Standards Track
 category: Core
-requires: NIP-1, NIP-2, NIP-3, NIP-9
 created: 2025-05-16
-version: 0.1-draft
-license: CC-BY-SA-4.0
+updated: 2025-05-18
+requires: NIP-1, NIP-2, NIP-3, NIP-4
 ---
 
-# 0 Summary
-NIP-5 standardises **Fiat-Proxy Top-Up** for Nuwa Agents across different blockchain environments:
+## Abstract
+
+NIP-5 standardises **Fiat-Proxy Top-Up** for AI Agents across different blockchain environments:
 
 * A **Proxy Registry** smart-contract is deployed on each participating blockchain (with an example implementation in Move/Solidity provided for illustration). This registry allows any licensed service (“Fiat Proxy”), identified by a DID (NIP-1), to register on-chain for specific tokens it supports on that chain.
 * Web2 users pay the proxy with card/Apple Pay/etc.; the proxy immediately mints or transfers the specified on-chain token (e.g., **RGas** on Rooch, or a similar native/utility token on other chains) to the user’s Agent DID on that specific blockchain.
@@ -20,9 +22,7 @@ NIP-5 standardises **Fiat-Proxy Top-Up** for Nuwa Agents across different blockc
 The protocol introduces no new signature or channel logic; it only standardises
 **discovery** (on a per-chain basis) and the **`fiatTopUp`() on-chain transaction** using DIDs for proxy identification.
 
----
-
-# 1 Motivation
+## Motivation
 
 | Need | Current gap | FPTP solution |
 |------|-------------|---------------|
@@ -30,9 +30,9 @@ The protocol introduces no new signature or channel logic; it only standardises
 | Ecosystem neutrality | No single on-ramp provider | On-chain registry & fee market |
 | Proof & audit | Off-chain receipt hard to verify | Proxy tx emits `FiatTopUp` event with hashed receipt |
 
----
+## Specification
 
-# 2 Terminology
+### Terminology
 
 | Term | Meaning |
 |------|---------|
@@ -40,15 +40,13 @@ The protocol introduces no new signature or channel logic; it only standardises
 | **Proxy Registry** | A smart-contract deployed on a specific blockchain (e.g., Rooch, or another supported chain) storing proxy DIDs, their supported tokens on that chain, metadata & fee schedules. The specific implementation (e.g., Move, Solidity) will vary by chain. |
 | **Top-Up Tx** | `fiatTopUp(recipient_did, amount_token, token_symbol, receipt_hash)` on-chain call executed by a registered Fiat Proxy (identified by its DID) on the chain where the token is being transferred. `token_symbol` specifies the token. |
 
----
-
-# 3 Proxy Registry Contract (Illustrative examples in Move / Solidity-pseudocode)
+### Proxy Registry Contract (Illustrative examples in Move / Solidity-pseudocode)
 
 _The following contract structures and functions are illustrative and specific to a single blockchain instance of the registry. A Fiat Proxy entity can register on multiple such registries across different chains._
 
 _A single Fiat Proxy (identified by its DID) can register multiple entries in a specific chain's registry if it supports multiple distinct tokens on that chain. Each entry is uniquely identified by the combination of the proxy's DID and the `token_symbol`._
 
-## 3.1 Data structure
+#### Data structure
 
 ```rust 
 // Example in Move-like pseudocode
@@ -59,7 +57,7 @@ struct ProxyServiceOffering has key { // Key would be (did, token_symbol)
     name:         String,              // Display name of the Fiat Proxy service
     url:          String,              // HTTPS base url for payment processing for this token
     fee_bps:      u16,                 // basis-points on exchanged amount for this token
-    payin_codes:  vector<u16>,         // see § 3.4, payment methods supported for this service
+    payin_codes:  vector<u16>,         // see § "payin_codes enumeration", payment methods supported for this service
     stake:        u64,                 // locked amount of the native gas/utility token of *this chain* (e.g., RGas if on Rooch)
     active:       bool                 // Whether this specific service offering is active
 }
@@ -73,8 +71,9 @@ struct ProxyServiceOffering has key { // Key would be (did, token_symbol)
 // Front-ends and Agents consuming this data MUST associate the `token_symbol` with the chain of
 // the queried Proxy Registry to avoid ambiguity. Chain-specific implementations of the Proxy Registry
 // are responsible for how they map these symbols to actual on-chain token contracts or native assets.
+```
 
-### 3.2 Core entry-points
+#### Core entry-points
 
 The caller's DID (e.g., transaction signer) is used to identify the Fiat Proxy. Operations are specific to a `token_symbol`.
 
@@ -88,7 +87,7 @@ The caller's DID (e.g., transaction signer) is used to identify the Fiat Proxy. 
 | `getOfferingsByDID(proxy_did: String, offset: u64, limit: u64)`      | View function to list all service offerings (tokens) by a specific `proxy_did` on this chain. Returns `vector<ProxyServiceOffering>`.    |
 | `listActiveOfferings(token_symbol_filter: Option<String>, offset: u64, limit: u64)` | View function to list all active service offerings on this chain, optionally filtered by `token_symbol`. Returns `vector<ProxyServiceOffering>`. |
 
-### 3.3 Events
+#### Events
 
 | Event                      | Payload                                         |
 | -------------------------- | ----------------------------------------------- |
@@ -96,7 +95,7 @@ The caller's DID (e.g., transaction signer) is used to identify the Fiat Proxy. 
 | `ProxyServiceStatusChanged`| `(did, token_symbol, active)`                   |
 | `ProxyServiceUpdated`      | `(did, token_symbol, name, url, fee_bps, codes)`|
 
-### 3.4 `payin_codes` enumeration
+#### `payin_codes` enumeration
 
 | Code  | Pay-in method                |
 | ----- | ---------------------------- |
@@ -109,9 +108,7 @@ The caller's DID (e.g., transaction signer) is used to identify the Fiat Proxy. 
 | `7`   | PayPal                       |
 | `10+` | *reserved* (DAO vote)        |
 
----
-
-# 4 Top-Up Transaction
+### Top-Up Transaction
 
 _The following function signature is illustrative and would be adapted for the specific smart contract language of the target blockchain. This transaction occurs on the chain where the token is being transferred._
 
@@ -134,9 +131,7 @@ public entry fun fiatTopUp(
 
 > **Funding the pool** — Each Fiat Proxy pre-loads the specific on-chain tokens it supports (e.g., RGas, USDC) into its own managed pool or account on this blockchain, according to the rules of this chain and token standard.
 
----
-
-# 5 Client & Runtime Behaviour
+### Client & Runtime Behaviour
 
 1. **Discovery**
    Front-end calls `registry.listActiveOfferings()` or `registry.getOfferingsByDID()` on the target chain's Proxy Registry to get proxy service details (including their DID, `token_symbol`, fee rates, supported `payin_codes`). Filters by `payin_codes`, `token_symbol`, and sorts by `fee_bps`.
@@ -149,9 +144,44 @@ public entry fun fiatTopUp(
     * The Agent (or its controlling UI/logic) can then decide to use these funds. For example, it might initiate opening a new NIP-3 state channel (which itself might be specified to use a particular token) or depositing into an existing one, based on its operational requirements or user instructions. This channel management is a subsequent action taken by the Agent, separate from the Fiat-Proxy's top-up process.
 5. The updated token balance (e.g., RGas or other tokens) is reflected in the Agent's UI or internal state.
 
----
+## Rationale
 
-# 6 Security & Compliance
+This section explains the "why" behind the design choices in the "Specification" section. It should:
+*   Describe alternative designs that were considered and why they were not chosen.
+*   Discuss related work or prior art.
+*   Provide evidence of community consensus or address significant objections raised during discussions.
+
+_(Rationale for FPTP design choices to be detailed here. E.g., why a registry model, why DID for proxies, choice of `receipt_hash`, etc.)_
+
+## Backwards Compatibility
+
+* **NIP-1**: Fiat Proxy DIDs must conform to NIP-1 for identity and key management.
+* **NIP-3** payment flows unchanged – top-up just funds channel balance.
+* Custodian model (NIP-9) unaffected; proxy may coexist with custodian or be the same entity.
+
+## Test Cases
+
+Test cases are highly recommended for all NIPs, and mandatory for NIPs proposing changes to consensus-critical or core protocol components.
+*   Provide concrete examples and expected outcomes.
+*   Link to test suites if available.
+
+_(Test cases for Proxy Registry interactions and `fiatTopUp` transaction to be detailed here. E.g., successful registration, successful top-up, failed top-up due to inactive proxy, etc.)_
+
+## Reference Implementation
+
+A reference implementation is highly recommended, and mandatory for NIPs proposing changes to consensus-critical or core protocol components.
+*   Link to the reference implementation (e.g., a GitHub repository or branch).
+
+_(Links to illustrative Move/Solidity implementations of the Proxy Registry and example `fiatTopUp` transaction logic to be provided here.)_
+_The pseudocode in the "Specification" section serves as a design illustration._
+
+## Security Considerations
+
+All NIPs must include a section discussing security implications. This should cover:
+*   Potential vulnerabilities introduced by the NIP.
+*   How the NIP mitigates these vulnerabilities.
+*   Any new attack surfaces.
+*   Security-relevant design decisions.
 
 | Topic                    | Measure                                                             |
 | ------------------------ | ------------------------------------------------------------------- |
@@ -160,17 +190,9 @@ public entry fun fiatTopUp(
 | Price slippage           | Proxy quote fixed for 15 min; on-chain amount must match quote.     |
 | Receipt integrity        | `receipt_hash` in event ties on-chain tx to off-chain payment.      |
 
----
+_(Additional security considerations, such as smart contract vulnerabilities in the registry, proxy key management, replay attacks on `receipt_hash` if not unique, etc., should be detailed here.)_
+_PCI-DSS compliance for card handling by the off-chain proxy service is an important consideration for proxies but outside the direct scope of the on-chain protocol itself._
 
-# 7 Backward Compatibility
+## Copyright
 
-* **NIP-1**: Fiat Proxy DIDs must conform to NIP-1 for identity and key management.
-* **NIP-3** payment flows unchanged – top-up just funds channel balance.
-* Custodian model (NIP-9) unaffected; proxy may coexist with custodian or be the same entity.
-
-
-# 8 References
-
-1. **NIP-3 — Agent Service Payment Protocol**
-2. **Relevant Token Standards** (e.g., Rooch Token Standard for RGas, ERC-20 for Ethereum tokens, etc., specific to the chain where the Proxy Registry and tokens reside)
-3. **PCI-DSS** guidelines (for card handling)
+Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
