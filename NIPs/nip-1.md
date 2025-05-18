@@ -48,6 +48,21 @@ Secure management and reliable recovery of master keys are critical.
 -   **Controller**: The `controller` field of the DID document must point to the entity holding the Master Key(s), which is typically the DID subject itself.
 -   **Recovery Mechanisms**: Robust key recovery mechanisms (e.g., Social Recovery, Multi-signature, Hardware Wallet, M-of-N schemes) are essential and depend on the adopted DID method and the Agent's nature.
 
+### Unified Service Discovery via DID Documents
+
+A core principle for the ecosystem is to enable simple and standardized discovery of services offered by Agents. NIP-1 establishes the use of the `service` property within a DID document as the **standard mechanism for service declaration and discovery**.
+
+-   **Service Declaration**: Any Agent (user or service provider) that offers a service discoverable by other Agents MUST declare these services within the `service` array of its DID document.
+-   **Standardized Service Types**: Each NIP that defines a specific service (e.g., a Fiat Proxy service as in NIP-5, an LLM Gateway as in NIP-9) MUST specify a unique `type` string for that service (e.g., `"FiatProxyServiceNIP5"`, `"LLMGatewayNIP9"`). This `type` is used in the `service.type` field of the service entry.
+-   **Service-Specific Metadata**: The NIP defining the service MUST also specify the structure of any additional metadata required for that service. This metadata should be included as properties within the corresponding `service` entry in the DID document. The `serviceEndpoint` property typically defines the primary interaction endpoint for the service.
+-   **Client Discovery**: Client Agents discover services by:
+    1.  Obtaining the DID of a potential service provider.
+    2.  Resolving the DID document associated with that DID.
+    3.  Iterating through the `service` array in the DID document, looking for entries with the desired `service.type`.
+    4.  Extracting the `serviceEndpoint` and other service-specific metadata to interact with the service.
+
+This approach ensures a consistent and decentralized way for services to be announced and discovered, leveraging the existing DID infrastructure.
+
 ### DID Document Structure Example
 
 Below is an example of a DID document conforming to this NIP. This example uses `did:example` as a placeholder for a concrete DID method.
@@ -60,53 +75,56 @@ Below is an example of a DID document conforming to this NIP. This example uses 
     *   The `expires` property can be used for keys with a defined lifetime, such as session keys.
 *   Verification relationships like `authentication`, `assertionMethod`, `capabilityInvocation`, and `capabilityDelegation` link to specific key `id`s from the `verificationMethod` array to define their permissions.
     *   `capabilityDelegation` is typically reserved for Master Keys or other high-privilege keys authorized to delegate capabilities.
-*   The `service` array is used to define service endpoints. This is particularly important for service Agents (e.g., custodians, gateways) to declare how they can be interacted with. The `type` property within a service entry should be used to specify the kind of service, as defined by relevant NIPs (e.g., "CustodianServiceNIP3", "LLMGatewayNIP9").
+*   The `service` array is used to define service endpoints. This is particularly important for service Agents (e.g., custodians, gateways) to declare how they can be interacted with. The `type` property within a service entry (e.g., `"FiatProxyServiceNIP5"`, `"LLMGatewayNIP9"`) should be used to specify the kind of service, as defined by relevant NIPs. The `serviceEndpoint` provides the primary URL for interacting with the service, and other properties within the service entry will contain service-specific metadata as defined by the NIP for that service `type`.
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/did/v1"],
+  "@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/suites/ed25519-2020/v1"],
   "id": "did:example:alice",
   "controller": "did:example:alice",
   "verificationMethod": [
     {
       "id": "did:example:alice#key-1",
-      "type": "EcdsaSecp256k1VerificationKey2019",
+      "type": "Ed25519VerificationKey2020",
       "controller": "did:example:alice",
-      "publicKeyHex": "0xabc123..."
+      "publicKeyMultibase": "zH3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV"
     },
     {
       "id": "did:example:alice#key-2",
-      "type": "EcdsaSecp256k1VerificationKey2019",
+      "type": "Ed25519VerificationKey2020",
       "controller": "did:example:alice",
-      "publicKeyHex": "0xdef456..."
-    },
-    {
-      "id": "did:example:alice#session-temp-xyz",
-      "type": "EcdsaSecp256k1VerificationKey2019",
-      "controller": "did:example:alice",
-      "publicKeyHex": "0xghi789...",
-      "expires": 1747252800
+      "publicKeyMultibase": "zH3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPZ",
+      "expires": "2025-12-31T23:59:59Z"
     }
   ],
   "authentication": [
     "did:example:alice#key-1"
   ],
   "assertionMethod": [
+    "did:example:alice#key-1"
+  ],
+  "capabilityInvocation": [
     "did:example:alice#key-1",
     "did:example:alice#key-2"
   ],
-  "capabilityInvocation": [
-     "did:example:alice#key-1",
-     "did:example:alice#key-2",
-     "did:example:alice#session-temp-xyz"
-  ],
   "capabilityDelegation": [
+    "did:example:alice#key-1" // Master key or key with delegation rights
   ],
   "service": [
     {
-      "id": "did:example:alice#my-llm-gateway",
-      "type": "LLMGatewayNIP9",
-      "serviceEndpoint": "https://llm-gateway.example.com/alice"
+      "id": "did:example:alice#llm-gateway",
+      "type": "LLMGatewayNIP9", // Example from NIP-9
+      "serviceEndpoint": "https://alice.example.com/llm",
+      // Additional LLM gateway specific properties as defined in NIP-9 would go here
+      "llmCapabilities": {
+        "supported_models": ["gpt-4", "claude-3-opus"],
+        "pricing_info_url": "https://alice.example.com/llm/pricing"
+      }
+    },
+    {
+      "id": "did:example:alice#social-profile",
+      "type": "SocialWebProfile",
+      "serviceEndpoint": "https://social.example.com/alice"
     }
   ]
 }
