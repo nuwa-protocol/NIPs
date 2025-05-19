@@ -2,16 +2,12 @@
 nip: 10
 title: MCP Identity Authentication and Payment Extension Protocol
 author: jolestar(@jolestar)
-discussions-to: <URL of the discussion thread, e.g., a GitHub issue or forum post>
 status: Draft
 type: Standards Track
 category: Core
 created: 2025-05-13
 updated: 2025-05-18
-requires:
-  - NIP-1
-  - NIP-2
-  - NIP-4
+requires: NIP-1, NIP-2, NIP-4
 ---
 
 ## Abstract

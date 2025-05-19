@@ -2,7 +2,6 @@
 nip: 9
 title: Agent LLM Gateway Protocol
 author: jolestar(@jolestar)
-discussions-to: <URL of the discussion thread>
 status: Draft
 type: Standards Track
 category: Agent
