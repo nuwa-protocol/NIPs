@@ -2,7 +2,7 @@
 nip: 2
 title: DID-Based Authentication Protocol
 author: jolestar(@jolestar)
-discussions-to: <URL of the discussion thread, e.g., a GitHub issue or forum post>
+discussions-to: https://github.com/nuwa-protocol/NIPs/discussions/4
 status: Draft
 type: Standards Track
 category: Core

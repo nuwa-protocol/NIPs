@@ -2,7 +2,7 @@
 nip: 1
 title: Agent Single DID Multi-Key Model
 author: jolestar(@jolestar)
-discussions-to: <URL to GitHub Issue or Discussion Forum> // TODO: Add discussion link
+discussions-to: https://github.com/nuwa-protocol/NIPs/discussions/3
 status: Draft
 type: Standards Track
 category: Core
