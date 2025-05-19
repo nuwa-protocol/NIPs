@@ -2,7 +2,6 @@
 nip: 5
 title: Fiat Proxy Service for AI Agents
 author: jolestar(@jolestar)
-discussions-to: <URL of the discussion thread, e.g., a GitHub issue or forum post> # TODO: Fill in discussions-to
 status: Draft
 type: Standards Track
 category: Core

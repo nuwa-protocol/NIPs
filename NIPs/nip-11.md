@@ -2,7 +2,6 @@
 nip: 11
 title: A2A Agent Service Payment Protocol
 author: jolestar(@jolestar)
-discussions-to: <Link to discussion thread>
 status: Draft
 type: Standards Track
 category: Core

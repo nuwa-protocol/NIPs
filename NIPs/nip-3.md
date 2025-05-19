@@ -2,7 +2,6 @@
 nip: 3
 title: Custodian Delegated Control Protocol
 author: jolestar(@jolestar)
-discussions-to: <URL of the discussion thread, e.g., a GitHub issue or forum post> # TODO: Fill in discussions-to
 status: Draft
 type: Standards Track
 category: Core

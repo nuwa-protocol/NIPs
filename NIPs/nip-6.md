@@ -2,7 +2,6 @@
 nip: 6
 title: Unified Agent State Synchronization
 author: jolestar(@jolestar)
-discussions-to: <Please provide URL of the discussion thread>
 status: Draft
 type: Standards Track
 category: Core

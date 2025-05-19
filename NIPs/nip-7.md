@@ -2,7 +2,7 @@
 nip: 7
 title: Agent Capability Protocol — Capability Package Specification
 author: jolestar(@jolestar)
-discussions-to: <URL of GitHub issue or discussion thread>
+discussions-to: https://github.com/nuwa-protocol/NIPs/discussions/8
 status: Draft
 type: Standards Track
 category: Core

@@ -2,7 +2,7 @@
 nip: 4
 title: A2A Payment Channel Protocol
 author: jolestar(@jolestar)
-discussions-to: <Link to discussion thread>
+discussions-to: https://github.com/nuwa-protocol/NIPs/discussions/7
 status: Draft
 type: Standards Track
 category: Core
