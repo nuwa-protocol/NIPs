@@ -9,7 +9,9 @@ title: Nuwa Improvement Proposals
 
 {% comment %} Fix all types of links in one go {% endcomment %}
 {% assign fixed_content = fixed_content | replace: 'href="./NIPs/nip-', 'href="/nips/nip-' %}
+{% assign fixed_content = fixed_content | replace: 'href="./nips/nip-', 'href="/nips/nip-' %}
 {% assign fixed_content = fixed_content | replace: '](./NIPs/nip-', '](/nips/nip-' %}
+{% assign fixed_content = fixed_content | replace: '](./nips/nip-', '](/nips/nip-' %}
 {% assign fixed_content = fixed_content | replace: '.md"', '/"' %}
 {% assign fixed_content = fixed_content | replace: '.md)', '/)' %}
 {% assign fixed_content = fixed_content | replace: '[nip-template.md](./nip-template.md)', '[nip-template.md](/nip-template.md)' %}

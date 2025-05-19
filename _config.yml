@@ -16,7 +16,7 @@ permalink: pretty
 # Custom layout for NIPs directory
 defaults:
   - scope:
-      path: "NIPs"
+      path: "nips"
     values:
       layout: "page"
 
