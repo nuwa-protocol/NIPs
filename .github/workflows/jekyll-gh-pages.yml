@@ -6,6 +6,10 @@ on:
   push:
     branches: ["main"]
 
+  # Add this section to trigger on pull requests
+  pull_request:
+    branches: ["main"] # Optional: only run for PRs targeting the main branch
+
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
