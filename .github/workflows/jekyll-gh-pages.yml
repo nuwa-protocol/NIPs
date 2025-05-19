@@ -53,3 +53,6 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # Explicitly set preview to true for pull requests
+          preview: ${{ github.event_name == 'pull_request' }}
