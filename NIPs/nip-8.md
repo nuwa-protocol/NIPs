@@ -1,6 +1,6 @@
 ---
 nip: 8
-title: Agent State Model (ASM): A Unified State Management Framework
+title: Agent State Model (ASM) - A Unified State Management Framework
 author: jolestar(@jolestar)
 status: Draft
 type: Standards Track
