@@ -1,0 +1,21 @@
+---
+layout: default
+---
+
+<h1>{{ page.title }}</h1>
+
+{% if page.nip != nil %}
+<p class="nip-meta">
+  <strong>NIP:</strong> {{ page.nip }}
+  {% if page.author %} | <strong>Author:</strong> {{ page.author }}{% endif %}
+  {% if page.status %} | <strong>Status:</strong> {{ page.status }}{% endif %}
+  {% if page.created %} | <strong>Created:</strong> {{ page.created | date: "%b %-d, %Y" }}{% endif %}
+</p>
+<hr>
+{% endif %}
+
+{{ content }}
+
+<div class="footer border-top border-gray-light mt-5 pt-3 text-right text-gray">
+  <a href="https://github.com/nuwa-protocol/NIPs/blob/main/{{ page.path }}">View on GitHub</a>
+</div>

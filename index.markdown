@@ -1,9 +1,17 @@
 ---
-# Feel free to add content and custom Front Matter to this file.
-# To modify the layout, see https://jekyllrb.com/docs/themes/#overriding-theme-defaults
-
-layout: default
+layout: home
+title: Nuwa Improvement Proposals
 ---
 
 {% capture readme_content %}{% include_relative README.md %}{% endcapture %}
-{{ readme_content | markdownify }}
+
+{% assign fixed_content = readme_content %}
+
+{% comment %} Fix all types of links in one go {% endcomment %}
+{% assign fixed_content = fixed_content | replace: 'href="./NIPs/nip-', 'href="/nips/nip-' %}
+{% assign fixed_content = fixed_content | replace: '](./NIPs/nip-', '](/nips/nip-' %}
+{% assign fixed_content = fixed_content | replace: '.md"', '/"' %}
+{% assign fixed_content = fixed_content | replace: '.md)', '/)' %}
+{% assign fixed_content = fixed_content | replace: '[nip-template.md](./nip-template.md)', '[nip-template.md](/nip-template.md)' %}
+
+{{ fixed_content | markdownify }}
