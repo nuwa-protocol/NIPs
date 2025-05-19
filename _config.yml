@@ -1,0 +1,45 @@
+# Site settings
+title: Nuwa Improvement Proposals
+email: hi@nuwa.dev
+description: >-
+  A collection of Nuwa Improvement Proposals (NIPs).
+baseurl: ""
+url: "https://nips.nuwa.dev"
+twitter_username: nuwadev
+github_username: nuwa-protocol
+repository: nuwa-protocol/NIPs
+
+# Build settings
+theme: jekyll-theme-primer
+permalink: pretty
+
+# Custom layout for NIPs directory
+defaults:
+  - scope:
+      path: "nips"
+    values:
+      layout: "page"
+
+# Configure GitHub metadata plugin
+github:
+  repository_url: https://github.com/nuwa-protocol/NIPs
+
+# Enable Jekyll plugins
+plugins:
+  - jekyll-seo-tag
+  - jekyll-github-metadata
+  - jekyll-include-cache
+  - jekyll-sitemap
+
+# Standard excludes
+exclude:
+  - .sass-cache/
+  - .jekyll-cache/
+  - gemfiles/
+  - Gemfile
+  - Gemfile.lock
+  - node_modules/
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/

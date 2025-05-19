@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="{{ site.lang | default: "en-US" }}">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+{% seo %}
+    <link rel="stylesheet" href="{{ "/assets/css/style.css?v=" | append: site.github.build_revision | relative_url }}">
+    
+    <!-- Add Mermaid.js support -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@9.1.6/dist/mermaid.min.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        mermaid.initialize({
+          startOnLoad: true,
+          theme: 'default',
+          securityLevel: 'loose',
+          flowchart: { useMaxWidth: true, htmlLabels: true }
+        });
+
+        // Process any code blocks with language-mermaid class
+        document.querySelectorAll('pre code.language-mermaid').forEach(function(el) {
+          var mermaidDiv = document.createElement('div');
+          mermaidDiv.className = 'mermaid';
+          mermaidDiv.innerHTML = el.textContent;
+          
+          var pre = el.parentNode;
+          pre.parentNode.replaceChild(mermaidDiv, pre);
+        });
+        
+        // Force mermaid to reprocess the page
+        setTimeout(function() {
+          mermaid.init(undefined, '.mermaid');
+        }, 250);
+      });
+    </script>
+
+    <style>
+      .mermaid {
+        margin: 1.5rem 0;
+        text-align: center;
+        overflow-x: auto;
+        background-color: #f6f8fa;
+        padding: 1rem;
+        border-radius: 4px;
+      }
+      
+      .header-nav {
+        margin-bottom: 1.5rem;
+      }
+      
+      .home-link {
+        display: inline-block;
+        color: #0366d6;
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.2s ease;
+      }
+      
+      .home-link:hover {
+        color: #0076ff;
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-lg px-3 my-5 markdown-body">
+      {{ content }}
+      
+      {% if site.github.private != true and site.github.license %}
+      <div class="footer border-top border-gray-light mt-5 pt-3 text-right text-gray">
+        This site is open source. {% github_edit_link "Improve this page" %}.
+      </div>
+      {% endif %}
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/anchor-js/4.1.0/anchor.min.js" integrity="sha256-lZaRhKri35AyJSypXXs4o6OPFTbTmUoltBbDCbdzegg=" crossorigin="anonymous"></script>
+    <script>anchors.add();</script>
+  </body>
+</html>
