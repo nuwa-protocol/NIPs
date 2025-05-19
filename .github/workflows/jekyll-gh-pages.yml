@@ -56,3 +56,8 @@ jobs:
         with:
           # Explicitly set preview to true for pull requests
           preview: ${{ github.event_name == 'pull_request' }}
+      - name: Output deployment URL
+        if: always()
+        run: |
+          echo "Deployment Page URL from step output: ${{ steps.deployment.outputs.page_url }}"
+          echo "GitHub Event Name: ${{ github.event_name }}"
