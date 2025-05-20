@@ -7,6 +7,7 @@ status: Draft
 type: Standards Track
 category: Core
 created: 2024-05-12
+updated: 2025-05-20
 requires: NIP-1 (DID Key Model)
 ---
 
@@ -48,7 +49,7 @@ The `signature_value` is a cryptographic signature calculated over a hash of the
 `hash = HASH_ALGORITHM(domainSeparator + contentToSign)`
 
 *   `HASH_ALGORITHM`: A strong cryptographic hash function (e.g., SHA256). The specific algorithm should be implied by the key type or explicitly defined by the application protocol.
-*   `domainSeparator`: A protocol-specific string that clearly identifies the context of the signature (e.g., `"EXAMPLE_A2A_AUTH_V1:"`, `"MY_RPC_API_V2_SIGNATURE:"`). This prevents replay attacks across different protocols or application domains.
+*   `domainSeparator`: A protocol-specific string that clearly identifies the context of the signature (e.g., `"EXAMPLE_A2A_AUTH_V1:"`, `"MY_RPC_API_V2_SIGNATURE:"`). This prevents replay attacks across different protocols or application domains. For services implementing the same protocol, each service provider should include its unique identifier in the domainSeparator (e.g., `"MY_API_V1_HTTP_AUTH:service-provider-id"`) to prevent cross-service replay attacks.
 *   `contentToSign`: The actual data whose integrity and origin are being authenticated. This could be an HTTP request body, specific fields from a message, a JSON-RPC request object, or any other defined payload. This content **must** include a `timestamp` (e.g., Unix timestamp in seconds) and a `nonce` (a unique random string) to prevent replay attacks.
 
 #### 3. General Authentication Flow (Conceptual)
@@ -193,7 +194,13 @@ The JSON structure for authentication data is chosen for its widespread support 
 ## Security Considerations
 
 *   **Inherited from NIP-1:** Security relies heavily on NIP-1's DID method security, key management, and DID document integrity.
-*   **Replay Attacks:** Strict validation of `timestamp` and `nonce` is critical. Verifiers **must** maintain stateful nonce storage scoped by `signer_did` and `domainSeparator`.
+*   **Replay Attacks:** Strict validation of `timestamp` and `nonce` is critical. Verifiers **must** maintain stateful nonce storage scoped by `signer_did` and `domainSeparator`. The nonce storage should be cleaned up periodically to prevent unbounded growth.
+*   **Service Provider Identification:** Each service provider implementing the same protocol should use a unique identifier in its `domainSeparator` to prevent cross-service replay attacks. This is especially important when multiple services implement the same protocol.
+*   **Nonce Management:** 
+    - Nonces should be generated using cryptographically secure random number generators
+    - Nonce storage should be implemented using distributed caching solutions for distributed service architectures
+    - Nonce validation should be scoped by both `signer_did` and `domainSeparator`
+    - Nonce storage should be cleaned up after the timestamp validation window expires
 *   **Transport Security:** Communication channels (e.g., HTTP, A2A transport) **must** use TLS/HTTPS or equivalent transport-layer security to protect confidentiality and integrity of the entire exchange, including authentication data.
 *   **DID Resolver Security:** Verifiers must use a trusted DID resolver.
 *   **Verification Relationship Check:** Verifiers **must** check that the signing key (`key_id`) is present in the appropriate verification relationship (usually `authentication`) in the DID document.
