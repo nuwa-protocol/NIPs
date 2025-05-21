@@ -1,5 +1,7 @@
 # NIPs - Nuwa Improvement Proposals
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/nuwa-protocol/NIPs)
+
 Welcome to the Nuwa Improvement Proposal (NIP) repository. NIPs are the primary way to propose new features, collect community input on issues, and document design decisions for the Nuwa Protocol and its ecosystem.
 
 ## Nuwa Protocol Overview
