@@ -26,6 +26,9 @@ To establish a consistent and secure identity framework for all participating en
 -   **DID Document Registration**: The public key information of each such Key is registered as a `verificationMethod` entry in the DID document associated with the master DID.
 -   **Fine-grained Verification Relationships**: By adding the `id` of a `verificationMethod` to different verification relationships (e.g., `authentication`, `assertionMethod`, `capabilityInvocation`, `capabilityDelegation`), the permission scope of each key can be precisely controlled.
 -   **Signatures Indicate Origin**: All signature operations initiated by an Agent using one of its keys must clearly indicate which key was used (via the `id` of the `verificationMethod`).
+-   **Passkey Boot-strap**: In scenarios where a traditional crypto wallet is not initially present, an Agent MAY begin its lifecycle with a DID based on the `did:key` method, where the key material is derived from a WebAuthn Passkey. This initial key SHOULD be listed in both the `authentication` and `capabilityDelegation` verification relationships of the `did:key` document, granting the user full control from inception.
+
+It is important to distinguish between a `verificationMethod` entry and a verification relationship. A `verificationMethod` entry primarily describes key material (e.g., the public key and its type). The verification relationship arrays (such as `authentication`, `assertionMethod`, `capabilityInvocation`, `capabilityDelegation`) declare the *purpose* or authorized uses of a specific key, referencing the `id` of a `verificationMethod` entry.
 
 ### General DID Method Support and Considerations for Advanced Functionality
 
@@ -53,7 +56,7 @@ Secure management and reliable recovery of master keys are critical.
 A core principle for the ecosystem is to enable simple and standardized discovery of services offered by Agents. NIP-1 establishes the use of the `service` property within a DID document as the **standard mechanism for service declaration and discovery**.
 
 -   **Service Declaration**: Any Agent (user or service provider) that offers a service discoverable by other Agents MUST declare these services within the `service` array of its DID document.
--   **Standardized Service Types**: Each NIP that defines a specific service (e.g., a Fiat Proxy service as in NIP-5, an LLM Gateway as in NIP-9) MUST specify a unique `type` string for that service (e.g., `"FiatProxyServiceNIP5"`, `"LLMGatewayNIP9"`). This `type` is used in the `service.type` field of the service entry.
+-   **Standardized Service Types**: Each NIP that defines a specific service (e.g., a Fiat Proxy service as in NIP-5, an LLM Gateway as in NIP-9) MUST specify a unique `type` string for that service (e.g., `"FiatProxyServiceNIP5"`, `"LLMGatewayNIP9"`, `"CadopCustodianService"`, `"Web2ProofServiceCADOP"`). This `type` is used in the `service.type` field of the service entry.
 -   **Service-Specific Metadata**: The NIP defining the service MUST also specify the structure of any additional metadata required for that service. This metadata should be included as properties within the corresponding `service` entry in the DID document. The `serviceEndpoint` property typically defines the primary interaction endpoint for the service.
 -   **Client Discovery**: Client Agents discover services by:
     1.  Obtaining the DID of a potential service provider.
@@ -167,6 +170,29 @@ Recommended strategies:
 
 **Recommendation**: Prioritize Verification Relationship-Based, combinable with Capability Objects.
 
+#### Specific Permissions for DID Document Updates
+
+To ensure clarity and consistent implementation, this NIP specifies the following mapping between DID document update operations and the required verification relationships. Any update to the DID document MUST be authorized by a signature from a key that is listed in the appropriate verification relationship array within the *current* version of the DID document being updated.
+
+*   **Managing Keys and Verification Relationships (`capabilityDelegation`)**:
+    *   Adding a new `verificationMethod` entry (i.e., registering a new key).
+    *   Removing an existing `verificationMethod` entry (i.e., revoking a key).
+    *   Modifying properties of an existing `verificationMethod` entry (e.g., `type`, `publicKeyMultibase`, `expires`).
+    *   Modifying the lists of key IDs within any of the verification relationship arrays (`authentication`, `assertionMethod`, `capabilityInvocation`, `capabilityDelegation` itself).
+    *   **Rationale**: These operations alter the fundamental security and control structure of the DID. Therefore, they require the highest level of authorization, granted by `capabilityDelegation`. Typically, only Master Key(s) or specifically designated high-privilege keys will possess this capability.
+
+*   **Managing Service Endpoints (`capabilityInvocation`)**:
+    *   Adding a new `service` entry to the `service` array.
+    *   Removing an existing `service` entry from the `service` array.
+    *   Modifying an existing `service` entry (e.g., changing `serviceEndpoint`, `type`, or service-specific metadata).
+    *   **Rationale**: These operations define how other Agents interact with the services offered by the DID subject. While significant, they are generally considered less critical than direct key management. `capabilityInvocation` allows designated keys to manage these service declarations.
+
+*   **Changing the DID Controller**:
+    *   Modifying the `controller` field of the DID document.
+    *   **Rationale**: This operation transfers the ultimate control over the DID document to a new entity. This is the most sensitive update and implicitly requires authorization by a key that is currently designated with `authentication` and `capabilityDelegation` rights and represents the authority of the current `controller`. The specific mechanism for controller updates may also be further defined by the DID method itself.
+ 
+Implementers MUST ensure that any attempt to update the DID document is validated against these permission requirements. An update operation MUST be rejected if the authorizing signature does not originate from a key possessing the necessary verification relationship as defined above.
+
 ### Device/Operational Key Registration / Update Protocol (Draft)
 
 This section outlines a high-level protocol for adding a new operational key (for a device, application, or other operational context) to the DID document.
@@ -272,6 +298,7 @@ This section incorporates and expands upon the "Security Policies" from the orig
 *   **Privacy Considerations**:
     *   Avoid storing sensitive instance/device-specific information directly in the public DID document. Use generic `key_id` fragments.
     *   Metadata exchanged during registration should be minimized and potentially encrypted if sensitive.
+*   **Passkey-based Sybil Risk**: While using WebAuthn Passkeys (often via `did:key`) for bootstrapping DIDs offers excellent usability, implementers should be aware of the potential for Sybil attacks if Passkey creation is too unconstrained. Pairing Passkey-based DID onboarding with mechanisms like proof-of-uniqueness or resource commitment, such as those that can be indicated by a Custodian-Assisted DID Onboarding Protocol (CADOP) provider (e.g., through its `sybilLevel` metadata or associated `Web2ProofServiceCADOP`), is recommended to mitigate this risk, especially for services sensitive to such attacks.
 
 ## Copyright
 
