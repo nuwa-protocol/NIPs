@@ -13,7 +13,7 @@ The Nuwa Protocol aims to establish a comprehensive and decentralized framework 
 *   **Decentralized Identity & Authentication:**
     *   Nuwa provides a foundational decentralized identity model for AI Agents using a single master DID to manage multiple operational keys and standardize service discovery (NIP-1).
     *   This is supported by a general-purpose DID-based authentication protocol for proving identity and message integrity (NIP-2).
-    *   To facilitate user adoption, a custodian delegated control protocol allows Web2 users to create and manage Agent DIDs without directly handling crypto wallets (NIP-3).
+    *   To facilitate user adoption, the Custodian-Assisted DID Onboarding Protocol (CADOP) (NIP-3) enables Web2 users to easily create and initialize their Agent DIDs (often starting with a `did:key` from a Passkey) with the help of an Identity Provider (IdP) and a Custodian, ensuring users retain full control over their DIDs from inception.
 
 *   **Flexible Payment & Monetization:**
     *   The protocol incorporates efficient off-chain micropayments between agents via A2A payment channels, particularly for protocol-level fees (NIP-4).
@@ -85,7 +85,7 @@ Below is a list of current Nuwa Improvement Proposals. Each NIP has a status ind
 | [0](./nips/nip-0.md)  | NIP Process                                                | Defines the Nuwa Improvement Proposal (NIP) process, outlining stages, roles, and criteria for proposing, discussing, and integrating changes.                 | Living |
 | [1](./nips/nip-1.md)  | Agent Single DID Multi-Key Model                           | Proposes a decentralized identity model for Agents using a single master DID to manage multiple operational keys and standardizes service discovery.             | Draft  |
 | [2](./nips/nip-2.md)  | DID-Based Authentication Protocol                          | Defines a general-purpose authentication protocol based on NIP-1 DIDs for proving identity and message integrity.                                                | Draft  |
-| [3](./nips/nip-3.md)  | Custodian Delegated Control Protocol                       | Allows Web2 users to create Agent DIDs via a Custodian service without directly managing crypto wallets.                                                             | Draft  |
+| [3](./nips/nip-3.md)  | Custodian-Assisted DID Onboarding Protocol (CADOP)         | Defines a protocol (CADOP) where Identity Providers attest to a user's client-generated DID (e.g., `did:key` from a Passkey) and Sybil resistance level, enabling a Custodian to assist the user in onboarding to their Agent DID while the user maintains full control. | Draft  |
 | [4](./nips/nip-4.md)  | A2A Payment Channel Protocol                               | Defines a protocol for A2A payment channels for efficient, off-chain micropayments, especially for protocol-level fees.                                          | Draft  |
 | [5](./nips/nip-5.md)  | Fiat Proxy Service for AI Agents                           | Enables AI Agents to interact with fiat payment systems through a standardized, discoverable Fiat Proxy service, authenticated via NIP-2.                        | Draft  |
 | [6](./nips/nip-6.md)  | Unified Agent State Synchronization                        | Defines a P2P protocol using CRDTs to synchronize an agent's state across multiple devices/applications, ensuring consistency and offline support.                 | Draft  |
