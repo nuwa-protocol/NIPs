@@ -274,36 +274,36 @@ sequenceDiagram
     participant Custodian as CadopCustodianService
     participant Chain as Verifiable Data Registry (e.g., Blockchain)
 
-    UClient->>UClient: User wishes to create Agent DID; generates initialAgentKey (e.g., via Passkey) which results in userDID (did:key)
-    Note over UClient: userDID (did:key) is now the subject.
+    UClient->>UClient: "User action: Gen initialKey (e.g. from Passkey) yielding userDID (a did:key)"
+    Note over UClient: "userDID (did:key) is now the subject."
 
-    UClient->>IdP: Initiate OIDC AuthN Request to /authorize (scope: openid did, state: {custodianDid, nonce}, client_id, redirect_uri, PKCE params)
-    IdP->>UClient: Authenticate User (e.g., IdP prompts user for Passkey, OAuth, etc.)
-    UClient-->>IdP: User completes authentication with IdP
-    IdP->>UClient: Redirect to client redirect_uri with OIDC AuthZ Code
+    UClient->>IdP: "Initiate OIDC AuthN Request to /authorize (scope: openid did, state: {custodianDid, nonce}, client_id, redirect_uri, PKCE params)"
+    IdP->>UClient: "Authenticate User (e.g., IdP prompts user for Passkey, OAuth, etc.)"
+    UClient-->>IdP: "User completes authentication with IdP"
+    IdP->>UClient: "Redirect to client redirect_uri with OIDC AuthZ Code"
 
-    UClient->>IdP: Exchange AuthZ Code for ID Token at /token (grant_type: authorization_code, code, redirect_uri, client_id, PKCE code_verifier)
-    IdP-->>UClient: ID Token (contains claims: iss, sub=userDID, aud=custodianDid, exp, iat, jti, nonce, pub_jwk=initialAgentKey's public JWK, sybil_level)
-    Note over UClient: Client verifies ID Token (nonce, etc.)
+    UClient->>IdP: "Exchange AuthZ Code for ID Token at /token (grant_type: authorization_code, code, redirect_uri, client_id, PKCE code_verifier)"
+    IdP-->>UClient: "ID Token (contains claims: iss, sub=userDID, aud=custodianDid, exp, iat, jti, nonce, pub_jwk=initialAgentKey's public JWK, sybil_level)"
+    Note over UClient: "Client verifies ID Token (nonce, etc.)"
 
-    UClient->>Custodian: Request DID Onboarding Assistance (e.g., POST /cadop/mint)
-    Note right of UClient: Payload includes: userDID (did:key), initialAgentKey_pub (JWK or other format), ID Token from IdP
+    UClient->>Custodian: "Request DID Onboarding Assistance (e.g., POST /cadop/mint)"
+    Note right of UClient: "Payload includes: userDID (did:key), initialAgentKey_pub (JWK or other format), ID Token from IdP"
     
-    Custodian->>Custodian: 1. Verify ID Token signature (using IdP's jwks_uri from trusted IdP list)
-    Custodian->>Custodian: 2. Validate claims (iss, aud, exp, jti, sub == did:key(pub_jwk from token), token.sybil_level >= custodian.min_sybilLevel)
+    Custodian->>Custodian: "1. Verify ID Token signature (using IdP's jwks_uri from trusted IdP list)"
+    Custodian->>Custodian: "2. Validate claims (iss, aud, exp, jti, sub == did:key(pub_jwk from token), token.sybil_level >= custodian.min_sybilLevel)"
     alt Verification Fails
-        Custodian-->>UClient: Error (e.g., 401 invalid_token, 403 insufficient_sybil_level)
+        Custodian-->>UClient: "Error (e.g., 401 invalid_token, 403 insufficient_sybil_level)"
     end
     
-    Note over Custodian: If verification successful, proceed to assist.
-    Custodian->>Chain: Facilitate Agent DID registration (e.g., if creating on-chain DID or associating did:key with on-chain account)
-    Note over Chain: New DID has userDID as controller.
-    Note over Chain: initialAgentKey_pub is in authentication & capabilityDelegation.
-    Note over Chain: Custodian's service key (if any, for its services) only in capabilityInvocation.
-    Chain-->>Custodian: tx_receipt / new_agent_did_details (if applicable)
+    Note over Custodian: "If verification successful, proceed to assist."
+    Custodian->>Chain: "Facilitate Agent DID registration (e.g., if creating on-chain DID or associating did:key with on-chain account)"
+    Note over Chain: "New DID has userDID as controller."
+    Note over Chain: "initialAgentKey_pub is in authentication & capabilityDelegation."
+    Note over Chain: "Custodian's service key (if any, for its services) only in capabilityInvocation."
+    Chain-->>Custodian: "tx_receipt / new_agent_did_details (if applicable)"
     
-    Custodian-->>UClient: Success (new_agent_did, confirmation)
-    UClient->>UClient: User now has a self-controlled Agent DID.
+    Custodian-->>UClient: "Success (new_agent_did, confirmation)"
+    UClient->>UClient: "User now has a self-controlled Agent DID."
 
 ```
 
