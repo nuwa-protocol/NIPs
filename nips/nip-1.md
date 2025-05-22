@@ -143,14 +143,13 @@ Below is an example of a DID document conforming to this NIP. This example uses 
     "did:example:alice#key-2"
   ],
   "capabilityDelegation": [
-    "did:example:alice#key-1" // Master key or key with delegation rights
+    "did:example:alice#key-1"
   ],
   "service": [
     {
       "id": "did:example:alice#llm-gateway",
-      "type": "LLMGatewayNIP9", // Example from NIP-9
+      "type": "LLMGatewayNIP9",
       "serviceEndpoint": "https://alice.example.com/llm",
-      // Additional LLM gateway specific properties as defined in NIP-9 would go here
       "llmCapabilities": {
         "supported_models": ["gpt-4", "claude-3-opus"],
         "pricing_info_url": "https://alice.example.com/llm/pricing"

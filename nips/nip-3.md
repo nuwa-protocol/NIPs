@@ -60,7 +60,7 @@ Each Custodian service endpoint in the DID document's `service` array for a `Cad
       "serviceEndpoint": "https://custodian.example.com/api/cadop",
       "metadata": {
         "name": "Example Custodian Inc.",
-        "auth_methods": [1, 7], // Supports Google OAuth and WebAuthn Passkey
+        "auth_methods": [1, 7],
         "sybilLevel": 1,
         "maxDailyMints": 1000
       }
@@ -129,7 +129,7 @@ An entity offering this IdP role MUST declare a `CadopIdPService` in its own DID
     {
       "id": "did:example:idp123#cadop-idp",
       "type": "CadopIdPService",
-      "serviceEndpoint": "https://id.example.com", // Base URI for OIDC endpoints
+      "serviceEndpoint": "https://id.example.com",
       "metadata": {
         "name": "Example Identity Provider",
         "jwks_uri": "https://id.example.com/.well-known/jwks.json",
