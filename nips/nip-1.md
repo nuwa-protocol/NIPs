@@ -31,6 +31,30 @@ To establish a consistent and secure identity framework for all participating en
 
 It is important to distinguish between a `verificationMethod` entry and a verification relationship. A `verificationMethod` entry primarily describes key material (e.g., the public key and its type). The verification relationship arrays (such as `authentication`, `assertionMethod`, `capabilityInvocation`, `capabilityDelegation`) declare the *purpose* or authorized uses of a specific key, referencing the `id` of a `verificationMethod` entry.
 
+To further clarify the common verification relationships used in DID documents (as defined in the W3C DID Core specification) and their relevance within this NIP and related protocols (like CADOP):
+
+*   **`authentication`**:
+    *   **Purpose**: Specifies how the DID subject can be authenticated. A `verificationMethod` listed under `authentication` is used to prove that the DID subject is performing an action under their control. Examples include signing a message to log into a service, establishing a secure session, or authorizing operations such as sending messages or initiating general on-chain transactions from an account associated with the DID.
+    *   **Relevance in NIP-1/CADOP**: Crucial for Agent login, session establishment, and authorizing operations. In the CADOP context, the user's initial key (e.g., from a Passkey) is placed in `authentication` (and `capabilityDelegation`) to grant them control.
+
+*   **`assertionMethod`**:
+    *   **Purpose**: Specifies how the DID subject can make verifiable assertions, such as issuing Verifiable Credentials. A `verificationMethod` listed here is authorized to sign credentials or other statements on behalf of the DID subject.
+    *   **Relevance in NIP-1/CADOP**: Enables Agents (users or services) to issue claims or credentials about themselves or other entities, forming a basis for trust and verifiable data exchange.
+
+*   **`keyAgreement`**:
+    *   **Purpose**: Specifies how an entity can establish secure encrypted communication channels with the DID subject. Keys listed here are typically used for cryptographic key exchange protocols (e.g., Diffie-Hellman).
+    *   **Relevance in NIP-1/CADOP**: Useful for establishing encrypted communication between Agents or between an Agent and a service. While not explicitly detailed in all NIP-1 examples, its inclusion here is for completeness regarding standard DID capabilities.
+
+*   **`capabilityInvocation`**:
+    *   **Purpose**: Specifies how the DID subject can invoke capabilities or perform actions, such as interacting with a service endpoint or operating on a resource. A `verificationMethod` listed here authorizes the key to make such invocations, essentially acting on behalf of the DID subject for specific operations.
+    *   **Relevance in NIP-1/CADOP**: Essential for authorizing operational keys to interact with services declared in the DID document. For example, a Custodian's service key, when listed in a user's DID document under `capabilityInvocation`, is authorized to call its own service endpoint in the context of that user (as per CADOP). This relationship is also used to authorize keys for managing the `service` entries themselves, as per NIP-1 permission rules.
+
+*   **`capabilityDelegation`**:
+    *   **Purpose**: Specifies how the DID subject can delegate its capabilities to another entity or key. A `verificationMethod` listed here is authorized to grant capabilities to other keys or DIDs. This relationship signifies a higher level of authority, often including the ability to manage other verification methods and their relationships within the DID document.
+    *   **Relevance in NIP-1/CADOP**: This represents the highest level of control over the DID. It is typically held by the DID's Master Key(s) or, in the CADOP user-centric model, by the user's primary controlling key (e.g., derived from a Passkey). This permission is required for managing keys, updating any verification relationship (including `capabilityDelegation` itself), and, under standard NIP-1 rules, for changing the DID `controller`.
+
+These verification relationships are fundamental for defining the security model and operational semantics of a DID, dictating what actions are permissible with different cryptographic keys associated with the DID.
+
 ### General DID Method Support and Considerations for Advanced Functionality
 
 This Agent model is designed to be compatible with any W3C compliant DID method. An Agent's master DID can, in principle, adopt any such method (e.g., `did:key`, `did:web`, `did:ethr`, `did:ion`). The choice of DID method determines how and where the DID document is stored and managed (i.e., the Verifiable Data Registry or VDR).
@@ -58,6 +82,13 @@ A core principle for the ecosystem is to enable simple and standardized discover
 
 -   **Service Declaration**: Any Agent (user or service provider) that offers a service discoverable by other Agents MUST declare these services within the `service` array of its DID document.
 -   **Standardized Service Types**: Each NIP that defines a specific service (e.g., a Fiat Proxy service as in NIP-5, an LLM Gateway as in NIP-9) MUST specify a unique `type` string for that service (e.g., `"FiatProxyServiceNIP5"`, `"LLMGatewayNIP9"`, `"CadopCustodianService"`, `"Web2ProofServiceCADOP"`, `"CadopIdPService"`). This `type` is used in the `service.type` field of the service entry.
+
+    To ensure clarity and uniqueness, service types within this ecosystem should follow one of the following naming conventions:
+    *   **For services that are integral components of a larger, named protocol (e.g., a protocol defined by a NIP or a set of NIPs)**: The service `type` should be prefixed with an abbreviation or a well-known name of the protocol, followed by the specific role of the service. Example: `CadopCustodianService`, where "Cadop" refers to the Custodian-Assisted DID Onboarding Protocol.
+    *   **For services defined by a specific NIP that are more standalone or represent a specific version/instance of a general service concept**: The service `type` should combine a descriptive name of the service concept with a suffix indicating the NIP number that defines it. Example: `FiatProxyServiceNIP5`, indicating a Fiat Proxy service as defined in NIP-5.
+    
+    This approach ensures that service types are both descriptive and directly linkable to their defining specifications.
+
 -   **Service-Specific Metadata**: The NIP defining the service MUST also specify the structure of any additional metadata required for that service. This metadata should be included as properties within the corresponding `service` entry in the DID document. The `serviceEndpoint` property typically defines the primary interaction endpoint for the service.
 -   **Client Discovery**: Client Agents discover services by:
     1.  Obtaining the DID of a potential service provider.
