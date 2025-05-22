@@ -32,6 +32,22 @@ The Nuwa Protocol aims to establish a comprehensive and decentralized framework 
 The Nuwa Improvement Proposals (NIPs) detailed in this repository represent the individual standards and components that collectively form the Nuwa Protocol. The NIP process itself (NIP-0) governs the proposal, discussion, and adoption of these standards, ensuring the protocol evolves in a transparent and community-driven manner.
 
 ```mermaid
+---
+config:
+  look: handDrawn
+  theme: base
+---
+%%{init: {
+  "themeVariables": {
+    "fontFamily": "Patrick Hand, Comic Sans MS, cursive",
+    "primaryColor": "#f0f0f0",
+    "primaryTextColor": "#333333",
+    "lineColor": "#888888",
+    "fontSize": "16px",
+    "edgeLabelBackground": "#ffffff"
+  },
+  "flowchart": { "curve": "basis" }
+}}%%
 graph TD
     U1["User Device/App 1"]
     U2["User Device/App 2"]
