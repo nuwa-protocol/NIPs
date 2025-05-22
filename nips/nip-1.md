@@ -56,7 +56,7 @@ Secure management and reliable recovery of master keys are critical.
 A core principle for the ecosystem is to enable simple and standardized discovery of services offered by Agents. NIP-1 establishes the use of the `service` property within a DID document as the **standard mechanism for service declaration and discovery**.
 
 -   **Service Declaration**: Any Agent (user or service provider) that offers a service discoverable by other Agents MUST declare these services within the `service` array of its DID document.
--   **Standardized Service Types**: Each NIP that defines a specific service (e.g., a Fiat Proxy service as in NIP-5, an LLM Gateway as in NIP-9) MUST specify a unique `type` string for that service (e.g., `"FiatProxyServiceNIP5"`, `"LLMGatewayNIP9"`, `"CadopCustodianService"`, `"Web2ProofServiceCADOP"`). This `type` is used in the `service.type` field of the service entry.
+-   **Standardized Service Types**: Each NIP that defines a specific service (e.g., a Fiat Proxy service as in NIP-5, an LLM Gateway as in NIP-9) MUST specify a unique `type` string for that service (e.g., `"FiatProxyServiceNIP5"`, `"LLMGatewayNIP9"`, `"CadopCustodianService"`, `"Web2ProofServiceCADOP"`, `"CadopIdPService"`). This `type` is used in the `service.type` field of the service entry.
 -   **Service-Specific Metadata**: The NIP defining the service MUST also specify the structure of any additional metadata required for that service. This metadata should be included as properties within the corresponding `service` entry in the DID document. The `serviceEndpoint` property typically defines the primary interaction endpoint for the service.
 -   **Client Discovery**: Client Agents discover services by:
     1.  Obtaining the DID of a potential service provider.
