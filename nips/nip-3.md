@@ -52,7 +52,6 @@ Each Custodian service endpoint in the DID document's `service` array for a `Cad
 {
   "@context": "https://www.w3.org/ns/did/v1",
   "id": "did:example:custodian123",
-  // ... other DID document properties like verificationMethod, authentication, etc. ...
   "service": [
     {
       "id": "did:example:custodian123#cadop-service",
@@ -65,7 +64,6 @@ Each Custodian service endpoint in the DID document's `service` array for a `Cad
         "maxDailyMints": 1000
       }
     },
-    // ... other services offered by the DID subject ...
   ]
 }
 ```
@@ -242,9 +240,8 @@ CADOP inherently supports the use of multiple `CadopIdPService` providers.
 | `4`   | GitHub OAuth     | OAuth 2            |
 | `5`   | Email OTP        | RFC 6120           |
 | `6`   | SMS OTP          | —                  |
-| `7`   | WebAuthn Passkey | FIDO2              |
-| `8`   | WeChat QR        | OAuth 2            |
-| `9`   | Discord OAuth    | OAuth 2            |
+| `7`   | WeChat QR        | OAuth 2            |
+| `8`   | Discord OAuth    | OAuth 2            |
 | `10+` | *Reserved*       | Added in future versions |
 
 ### Sybil Resistance, Proof Levels, and Quotas
