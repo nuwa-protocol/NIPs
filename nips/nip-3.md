@@ -274,7 +274,7 @@ sequenceDiagram
     participant Custodian as CadopCustodianService
     participant Chain as Verifiable Data Registry (e.g., Blockchain)
 
-    UClient->>UClient: User wishes to create Agent DID; generates initialAgentKey (e.g., from Passkey) -> userDID (did:key)
+    UClient->>UClient: User wishes to create Agent DID; generates initialAgentKey (e.g., via Passkey) which results in userDID (did:key)
     Note over UClient: userDID (did:key) is now the subject.
 
     UClient->>IdP: Initiate OIDC AuthN Request to /authorize (scope: openid did, state: {custodianDid, nonce}, client_id, redirect_uri, PKCE params)
