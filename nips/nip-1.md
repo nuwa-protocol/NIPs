@@ -7,7 +7,7 @@ status: Draft
 type: Standards Track
 category: Core
 created: 2024-05-12
-updated: 2025-05-22
+updated: 2025-05-26
 ---
 
 ## Abstract
@@ -107,7 +107,6 @@ Below is an example of a DID document conforming to this NIP. This example uses 
 *   Each entry in `verificationMethod` represents an operational key.
     *   The `id` within a `verificationMethod` entry (e.g., `did:example:alice#key-1`) is a generic identifier for that specific key.
     *   The `type` (e.g., `EcdsaSecp256k1VerificationKey2019`) specifies the cryptographic suite of the key. Other types like `Ed25519VerificationKey2020` are also permissible.
-    *   The `expires` property can be used for keys with a defined lifetime, such as session keys.
 *   Verification relationships like `authentication`, `assertionMethod`, `capabilityInvocation`, and `capabilityDelegation` link to specific key `id`s from the `verificationMethod` array to define their permissions.
     *   `capabilityDelegation` is typically reserved for Master Keys or other high-privilege keys authorized to delegate capabilities.
 *   The `service` array is used to define service endpoints. This is particularly important for service Agents (e.g., custodians, gateways) to declare how they can be interacted with. The `type` property within a service entry (e.g., `"FiatProxyServiceNIP5"`, `"LLMGatewayNIP9"`) should be used to specify the kind of service, as defined by relevant NIPs. The `serviceEndpoint` provides the primary URL for interacting with the service, and other properties within the service entry will contain service-specific metadata as defined by the NIP for that service `type`.
@@ -129,7 +128,6 @@ Below is an example of a DID document conforming to this NIP. This example uses 
       "type": "Ed25519VerificationKey2020",
       "controller": "did:example:alice",
       "publicKeyMultibase": "zH3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPZ",
-      "expires": "2025-12-31T23:59:59Z"
     }
   ],
   "authentication": [
@@ -208,7 +206,7 @@ To ensure clarity and consistent implementation, this NIP specifies the followin
 *   **Managing Keys and Verification Relationships (`capabilityDelegation`)**:
     *   Adding a new `verificationMethod` entry (i.e., registering a new key).
     *   Removing an existing `verificationMethod` entry (i.e., revoking a key).
-    *   Modifying properties of an existing `verificationMethod` entry (e.g., `type`, `publicKeyMultibase`, `expires`).
+    *   Modifying properties of an existing `verificationMethod` entry (e.g., `type`, `publicKeyMultibase`).
     *   Modifying the lists of key IDs within any of the verification relationship arrays (`authentication`, `assertionMethod`, `capabilityInvocation`, `capabilityDelegation` itself).
     *   **Rationale**: These operations alter the fundamental security and control structure of the DID. Therefore, they require the highest level of authorization, granted by `capabilityDelegation`. Typically, only Master Key(s) or specifically designated high-privilege keys will possess this capability.
 
@@ -270,7 +268,6 @@ Test cases should cover, at a minimum:
 5.  Verification of a signature where the `key_id` has `capabilityInvocation` but not `authentication` permission.
 6.  Revocation of an operational key and subsequent failure of signature verification using the revoked key.
 7.  Attempted registration of an operational key without proper authorization (should fail).
-8.  Verification of a signature with an expired session key (if `expires` is used).
 9.  Replay attack prevention using `nonce` and `timestamp`.
 
 *(Specific test vectors and a test suite are to be developed alongside a reference implementation.)*
@@ -310,8 +307,6 @@ This section incorporates and expands upon the "Security Policies" from the orig
     *   **Compromise**: If an operational key is compromised, it should be promptly revoked by the Controller. The scope of damage is limited by the permissions granted to that key.
     *   **Revocation**: The revocation process must be secure, ensuring only a legitimate Controller can perform it. Delays in VDR updates could mean a compromised key remains valid for a short period.
     *   **Rotation**: Regular rotation of operational keys is recommended to limit the window of opportunity if a key is silently compromised.
-*   **Session Keys**:
-    *   **Expiration**: Verifiers *must* check the `expires` attribute. Clock synchronization issues could lead to premature or delayed invalidation if not handled carefully (e.g., allowing a small grace period).
 *   **Signature Integrity & Anti-Replay**:
     *   **Nonce**: Verifiers must maintain a list of used nonces per `signer_did` (or `key_id`) to prevent replay. This requires stateful verifiers.
     *   **Timestamp**: Timestamps prevent replay of old signatures. A defined, reasonable verification window is needed, balancing security with tolerance for clock skew.
