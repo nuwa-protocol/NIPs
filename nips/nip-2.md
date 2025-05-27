@@ -61,24 +61,24 @@ graph TD
     subgraph Signer
         A[Construct Message/Request with Timestamp & Nonce] --> B{Identify Own DID and Signing Key};
         B --> C[Define Domain Separator and Content to Sign];
-        C --> D[Calculate Hash: HASH_ALGORITHM(domainSeparator + contentToSign)];
+        C --> D["Calculate Hash: HASH_ALGORITHM(domainSeparator + contentToSign)"];
         D --> E[Sign Hash with Private Key, Obtain signature_value];
-        E --> F[Assemble Authentication Data: {signer_did, key_id, signature_value}];
+        E --> F["Assemble Authentication Data: {signer_did, key_id, signature_value}"];
     end
     subgraph Verifier
         G[Receive Message/Request and Authentication Data] --> H{Parse Authentication Data};
         H --> I[Extract Timestamp & Nonce from Message/Request];
-        I --> J{Verify Replay Protection (Timestamp window, Nonce uniqueness)};
+        I --> J{"Verify Replay Protection (Timestamp window, Nonce uniqueness)"};
         J -- Failed --> X[Error: Replay Attack];
-        J -- Passed --> K[Reconstruct Content to Sign (using received message parts)];
-        K --> L[Calculate HashToVerify: HASH_ALGORITHM(domainSeparator + contentToSign)];
+        J -- Passed --> K["Reconstruct Content to Sign (using received message parts)"];
+        K --> L["Calculate HashToVerify: HASH_ALGORITHM(domainSeparator + contentToSign)"];
         L --> M{Resolve signer_did to get DID Document};
         M -- Failed --> Y[Error: DID Resolution Failed];
         M -- Passed --> N{Find Public Key for key_id in DID Document};
         N -- Failed --> Z[Error: Key Not Found];
         N -- Passed --> O{Verify Signature using Public Key and HashToVerify};
         O -- Failed --> AA[Error: Invalid Signature];
-        O -- Passed --> P{Verify Key Permissions (e.g., 'authentication' relationship)};
+        O -- Passed --> P{"Verify Key Permissions (e.g., 'authentication' relationship)"};
         P -- Failed --> BB[Error: Permission Denied];
         P -- Passed --> Q[Authentication Successful: Identity Confirmed];
     end
