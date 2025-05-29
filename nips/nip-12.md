@@ -15,7 +15,7 @@ superseded-by: <NIP number(s)>
 
 ## Abstract
 
-This NIP provides general interface for timestamping transactions using Opentimestamps where ordinary timestamp interfaces are not provided upon creation of transactions.
+This NIP provides general interface for timestamping transactions using Opentimestamps where ordinary timestamp interfaces are not provided upon creation of transactions, or the timestamp needs to be attested or two-step verified.
 
 ## Motivation
 
