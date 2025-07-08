@@ -7,7 +7,7 @@ status: Draft
 type: Standards Track
 category: Core
 created: 2024-05-12
-updated: 2025-05-26
+updated: 2025-07-07
 ---
 
 ## Abstract
@@ -81,7 +81,7 @@ Secure management and reliable recovery of master keys are critical.
 A core principle for the ecosystem is to enable simple and standardized discovery of services offered by Agents. NIP-1 establishes the use of the `service` property within a DID document as the **standard mechanism for service declaration and discovery**.
 
 -   **Service Declaration**: Any Agent (user or service provider) that offers a service discoverable by other Agents MUST declare these services within the `service` array of its DID document.
--   **Standardized Service Types**: Each NIP that defines a specific service (e.g., a Fiat Proxy service as in NIP-5, an LLM Gateway as in NIP-9) MUST specify a unique `type` string for that service (e.g., `"FiatProxyServiceNIP5"`, `"LLMGatewayNIP9"`, `"CadopCustodianService"`, `"Web2ProofServiceCADOP"`, `"CadopIdPService"`). This `type` is used in the `service.type` field of the service entry.
+-   **Standardized Service Types**: Each NIP that defines a specific service (e.g., a Fiat Proxy service as in NIP-5, an LLM Gateway as in NIP-9) MUST specify a unique `type` string for that service (e.g., `"FiatProxyServiceNIP5"`, `"LLMGatewayNIP9"`, `"CadopCustodianService"`, `"CadopWeb2ProofService"`, `"CadopIdPService"`). This `type` is used in the `service.type` field of the service entry.
 
     To ensure clarity and uniqueness, service types within this ecosystem should follow one of the following naming conventions:
     *   **For services that are integral components of a larger, named protocol (e.g., a protocol defined by a NIP or a set of NIPs)**: The service `type` should be prefixed with an abbreviation or a well-known name of the protocol, followed by the specific role of the service. Example: `CadopCustodianService`, where "Cadop" refers to the Custodian-Assisted DID Onboarding Protocol.
@@ -288,13 +288,13 @@ Addressing these challenges will be crucial for realizing the full potential of 
 
 ## Reference Implementation
 
-A reference implementation is planned but not yet available. It should demonstrate:
--   Libraries for master DID creation and management (for a chosen DID method, e.g., `did:key` for simplicity, or a more specific one like a potential `did:rooch`).
--   Agent-side logic for operational key generation and registration requests.
--   Controller/Management Service logic for handling key registration and VDR updates.
--   Verifier logic for resolving DIDs and validating signatures according to this NIP.
+The official reference implementation for TypeScript/JavaScript environments is [`@nuwa-ai/identity-kit`](https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-kit/typescript/packages/identity-kit). It provides:
+-   A high-level `IdentityKit` class for managing the full lifecycle of a DID, including operational key management (add/remove `verificationMethod`) and service endpoint management, compliant with NIP-1.
+-   Pluggable VDR (Verifiable Data Registry) modules, with built-in support for `did:key` and `did:rooch`.
+-   A `KeyManager` for handling cryptographic keys, with default storage backends for browsers (`LocalStorage`, `IndexedDB`) and Node.js (`Memory`).
+-   Utilities for cryptographic operations and signature generation/verification that form the foundation for NIP-2.
 
-*(Link to repository will be provided here when available.)*
+This SDK serves as the canonical implementation of the NIP-1 model.
 
 ## Security Considerations
 
