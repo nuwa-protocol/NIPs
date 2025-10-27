@@ -16,18 +16,14 @@ The Nuwa Protocol aims to establish a comprehensive and decentralized framework 
     *   To facilitate user adoption, the Custodian-Assisted DID Onboarding Protocol (CADOP) (NIP-3) enables Web2 users to easily create and initialize their Agent DIDs (often starting with a `did:key` from a Passkey) with the help of an Identity Provider (IdP) and a Custodian, ensuring users retain full control over their DIDs from inception.
 
 *   **Flexible Payment & Monetization:**
-    *   The protocol incorporates efficient off-chain micropayments between agents via A2A payment channels, particularly for protocol-level fees (NIP-4).
-    *   It enables AI Agents to interact with traditional fiat payment systems through a standardized and discoverable Fiat Proxy service (NIP-5).
-    *   A dedicated protocol allows for on-demand payment for application-level services provided by AI Agents to User Agents, using direct pre-payment or NIP-4 channels (NIP-11).
+    *   The protocol incorporates efficient off-chain micropayments between agents via payment channels, particularly for protocol-level fees (NIP-4).
 
-*   **Unified Agent State & Capabilities:**
-    *   Nuwa ensures consistent agent state synchronization across multiple devices and applications using a P2P protocol based on CRDTs (NIP-6).
-    *   Agent capabilities are designed to be modular and discoverable, defined by a standardized capability package specification (NIP-7).
-    *   A unified Agent State Model (ASM) extends JSON-Schema with `x-asm` annotations for describing, merging (using CRDTs), querying, and managing persistent agent states (NIP-8).
+*   **Agent Capabilities & Extensions:**
+    *   Agent capabilities are designed to be modular and discoverable, defined by a standardized capability package specification (NIP-5).
 
 *   **Interoperable Service Interaction & Gateways:**
-    *   The protocol defines how AI Agents can access Large Language Model (LLM) services through verifiable, identity-bound gateways with standardized request/response formats and payment integration (NIP-9).
-    *   It also extends the Model Context Protocol (MCP) by integrating standard mechanisms for identity authentication (based on NIP-1 and NIP-2) and payment (based on NIP-4), enhancing interoperability (NIP-10).
+    *   The protocol defines how AI Agents can access Large Language Model (LLM) services through verifiable, identity-bound gateways with standardized request/response formats and payment integration (NIP-6).
+    *   It also extends the Model Context Protocol (MCP) by integrating standard mechanisms for identity authentication (based on NIP-1 and NIP-2) and payment (based on NIP-4), enhancing interoperability (NIP-7).
 
 The Nuwa Improvement Proposals (NIPs) detailed in this repository represent the individual standards and components that collectively form the Nuwa Protocol. The NIP process itself (NIP-0) governs the proposal, discussion, and adoption of these standards, ensuring the protocol evolves in a transparent and community-driven manner.
 
@@ -102,14 +98,10 @@ Below is a list of current Nuwa Improvement Proposals. Each NIP has a status ind
 | [1](./nips/nip-1.md)  | Agent Single DID Multi-Key Model                           | Proposes a decentralized identity model for Agents using a single master DID to manage multiple operational keys and standardizes service discovery.             | Draft  |
 | [2](./nips/nip-2.md)  | DID-Based Authentication Protocol                          | Defines a general-purpose authentication protocol based on NIP-1 DIDs for proving identity and message integrity.                                                | Draft  |
 | [3](./nips/nip-3.md)  | Custodian-Assisted DID Onboarding Protocol (CADOP)         | Defines a protocol (CADOP) where Identity Providers attest to a user's client-generated DID (e.g., `did:key` from a Passkey) and Sybil resistance level, enabling a Custodian to assist the user in onboarding to their Agent DID while the user maintains full control. | Draft  |
-| [4](./nips/nip-4.md)  | A2A Payment Channel Protocol                               | Defines a protocol for A2A payment channels for efficient, off-chain micropayments, especially for protocol-level fees.                                          | Draft  |
-| [5](./nips/nip-5.md)  | Fiat Proxy Service for AI Agents                           | Enables AI Agents to interact with fiat payment systems through a standardized, discoverable Fiat Proxy service, authenticated via NIP-2.                        | Draft  |
-| [6](./nips/nip-6.md)  | Unified Agent State Synchronization                        | Defines a P2P protocol using CRDTs to synchronize an agent's state across multiple devices/applications, ensuring consistency and offline support.                 | Draft  |
-| [7](./nips/nip-7.md)  | Agent Capability Protocol — Capability Package Specification | Specifies the ".acp.yaml" format for modular Agent Capability Packages, bundling schema, prompts, tools, and metadata.                                          | Draft  |
-| [8](./nips/nip-8.md)  | Agent State Model (ASM): A Unified State Management Framework | Extends JSON-Schema with `x-asm` annotations for describing, merging (CRDTs), querying (ASM-QL), and managing persistent agent states.                        | Draft  |
-| [9](./nips/nip-9.md)  | Agent LLM Gateway Protocol                                 | Defines a protocol for AI Agents to access LLM services through verifiable, identity-bound gateways with standardized request/response and payment integration. | Draft  |
-| [10](./nips/nip-10.md) | MCP Identity Authentication and Payment Extension Protocol   | Extends the Model Context Protocol (MCP) with standard mechanisms for identity authentication (NIP-1/2) and payment (NIP-4).                                  | Draft  |
-| [11](./nips/nip-11.md) | A2A Agent Service Payment Protocol                         | Defines a protocol for on-demand payment for application-level services provided by AI Agents to User Agents, using direct pre-payment or NIP-4 channels.      | Draft  |
+| [4](./nips/nip-4.md)  | Payment Channel Protocol                                   | Defines a protocol for payment channels for efficient, off-chain micropayments, especially for protocol-level fees.                                              | Draft  |
+| [5](./nips/nip-5.md)  | Agent Capability Protocol — Capability Package Specification | Specifies the ".acp.yaml" format for modular Agent Capability Packages, bundling schema, prompts, tools, and metadata.                                          | Draft  |
+| [6](./nips/nip-6.md)  | Agent LLM Gateway Protocol                                 | Defines a protocol for AI Agents to access LLM services through verifiable, identity-bound gateways with standardized request/response and payment integration. | Draft  |
+| [7](./nips/nip-7.md)  | MCP Identity Authentication and Payment Extension Protocol   | Extends the Model Context Protocol (MCP) with standard mechanisms for identity authentication (NIP-1/2) and payment (NIP-4).                                  | Draft  |
 
 ## How to Contribute
 

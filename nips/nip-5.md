@@ -1,212 +1,340 @@
 ---
 nip: 5
-title: Fiat Proxy Service for AI Agents
+title: Agent Capability Protocol — Capability Package Specification
 author: jolestar(@jolestar)
+discussions-to: https://github.com/nuwa-protocol/NIPs/discussions/8
 status: Draft
 type: Standards Track
 category: Core
-created: 2025-05-15
-requires: NIP-1, NIP-2, NIP-3
+created: 2025-05-13
+updated: 2025-05-18
+requires: NIP-1
 ---
 
 ## Abstract
 
-*NIP-5* defines a **Fiat Proxy Service** that enables AI Agents (identified by DIDs as per NIP-1) to interact with fiat payment systems. This service acts as a bridge, allowing agents to perform actions like initiating payments or verifying payment status through a standardized API. Fiat Proxy services are discoverable via their DID documents, and all API interactions are authenticated using NIP-2.
+*Agent Capability Protocol* (ACP) defines how an **Agent Capability Package** (file suffix **`.acp.yaml`**) bundles:
+
+* a **JSON Schema** that formalises the state objects this capability owns;
+* a **canonical prompt** (system/assistant template) that instructs an LLM how to use the capability;
+* a **tool manifest** (OpenAI Tools format) that maps user intent to runtime functions;
+* descriptive **metadata** (ID, triggers, permissions, signature).
+
+A single ACP file can be published to a decentralised **Capability Registry**, discovered by any Nuwa-compatible Router, installed at runtime, and cleanly removed or upgraded.
+State persistence is performed via the standard `state.*` tool family provided by the Nuwa runtime.
 
 ## Motivation
 
-AI Agents often need to interact with traditional financial systems, which typically require authenticated API access, KYC/AML compliance, and handling of sensitive payment information. Directly embedding these capabilities into every agent is impractical and insecure. A Fiat Proxy Service provides a secure and standardized way for agents to access these systems.
+Current agents are monolithic: a huge prompt plus ad-hoc tools. Scaling to dozens of tasks explodes context size and tangles memory. ACP makes each task a plug-in that can be:
 
-| Pain point | Effect | Solution offered by NIP-5 |
-|------------|--------|---------------------------|
-| Agents need to **trigger fiat payments** | Complex integration with diverse payment gateways | Standardized API via Fiat Proxy |
-| Agents need to **verify payment status** | Requires polling or webhooks | Standardized API for status checks |
-| **Security and Compliance** | Agents handling raw payment credentials is risky | Proxy handles credentials and compliance; Agent interacts via DID authentication |
-| **Service Discovery** | How do agents find a suitable Fiat Proxy? | Proxies declare their services in their DID documents (NIP-1) |
+* **installed / uninstalled on demand**,
+* **hot-swapped** inside one chat session via a Router stack,
+* **independently versioned & governed**,
+* **securely sandboxed** with least-privilege storage calls.
 
 ## Specification
 
-### Fiat Proxy Service Declaration in DID Document
+### Terminology
 
-Fiat Proxy services declare their offerings as part of their DID document (NIP-1) using the `service` property. This allows AI Agents and their clients to discover and interact with Fiat Proxy services in a decentralized manner.
+| Term               | Meaning                                                                      |
+| ------------------ | ---------------------------------------------------------------------------- |
+| **ACP file**       | The single YAML document that ships one capability.                          |
+| **Capability URI** | `did:nuwa:cap:<name>@<semver>` — globally unique ID for the package. The `<name>` component MUST be unique within the `did:nuwa:cap` namespace to ensure the URI's global uniqueness. |
+| **Schema URI**     | `$id` of the JSON Schema, usually `did:nuwa:state:<name>#<ver>`.             |
+| **Router**         | Top-level agent component that routes messages to sub-agents (capabilities). |
+| **Registry**       | Decentralised index (chain + IPFS) that stores ACP metadata & file CIDs.     |
 
-Each Fiat Proxy service endpoint in the DID document's `service` array MUST include:
-*   `id`: A URI that conforms to the DID Core specification, typically a fragment identifier relative to the Proxy's DID (e.g., `did:example:fiatproxy123#fiat-proxy-service`).
-*   `type`: A string identifying the type of service. For NIP-5 Fiat Proxy services, this MUST be `FiatProxyServiceNIP5`.
-*   `serviceEndpoint`: A URI specifying the HTTPS base URL for the Fiat Proxy's API.
-*   `metadata`: An optional JSON object containing additional information about the service, such as:
-    *   `name`: (String) A human-readable name for the Fiat Proxy service.
-    *   `supported_currencies`: (array of String) A list of ISO 4217 currency codes supported (e.g., `["USD", "EUR"]`).
-    *   `supported_payment_methods`: (array of String) A list of payment methods supported (e.g., `["credit_card", "paypal"]`).
-    *   `regions_served`: (array of String) A list of ISO 3166-1 alpha-2 country codes where the service is available.
-    *   `fee_structure_url`: (String) A URL pointing to documentation about the proxy's fee structure.
+### File format (`.acp.yaml`)
 
-**Example DID Document Snippet for a Fiat Proxy:**
+#### Top-level sections
 
-```json
-{
-  "@context": "https://www.w3.org/ns/did/v1",
-  "id": "did:example:fiatproxy456",
-  // ... other DID document properties like verificationMethod, authentication, etc. ...
-  "service": [
-    {
-      "id": "did:example:fiatproxy456#fiat-proxy",
-      "type": "FiatProxyServiceNIP5",
-      "serviceEndpoint": "https://proxy.example.com/api/v1",
-      "metadata": {
-        "name": "Example Global Fiat Proxy",
-        "supported_currencies": ["USD", "EUR", "JPY"],
-        "supported_payment_methods": ["credit_card", "bank_transfer"],
-        "regions_served": ["US", "CA", "GB"],
-        "fee_structure_url": "https://proxy.example.com/fees"
-      }
+```yaml
+metadata:       | required | ACP & trigger info, including optional LLM requirements
+schema:         | required | JSON-Schema 2020-12 (string block)
+prompt:         | optional | Markdown or plain-text template (string block)
+tools:          | optional | Tool list (YAML array, OpenAI format) - Interface for LLM
+tool_bindings:  | optional | Defines execution for non-built-in tools - Implementation for Runtime
+```
+
+#### Minimal example
+
+```yaml
+# ========= Agent Capability Package =========
+metadata:
+  id: did:nuwa:cap:note@1.0.0
+  name: "Note"
+  description: "Create & manage personal notes, optionally fetching content from web pages or describing images."
+  triggers:
+    - {type: regex, value: "记(.*)笔记|note|add note about"}
+  memory_scope: sc:note
+  permissions:
+    require: ["state.create", "state.update", "state.query"]
+  llm_requirements: # Optional: Specify LLM dependencies
+    model_family: ["gpt-4", "claude-3"] # Suggests compatibility with these model families
+    min_context_window: 16000 # Example: requires at least 16k context window
+    # Other potential fields: specific_model_uri, required_features: ["tool_use_json_mode"]
+  signature: zDIDSig1xyz…          # sha256 over whole file, signed by author DID key
+
+schema: |
+  { "$schema":"https://json-schema.org/draft/2020-12/schema",
+    "$id":"did:nuwa:state:note#v1",
+    "type":"object",
+    "properties":{
+      "id":{"type":"string","format":"uuid"},
+      "title":{"type":"string","x-crdt":"lww_register"},
+      "body":{"type":"string","x-crdt":"rga_text"},
+      "source_url":{"type":"string","format":"uri", "description":"Optional URL of the source webpage or image."},
+      "tags":{"type":"array","items":{"type":"string"},"x-crdt":"grow_only_set"},
+      "createdAt":{"type":"string","format":"date-time"},
+      "updatedAt":{"type":"string","format":"date-time"}
+    },
+    "required":["id","title","body","createdAt","updatedAt"]
+  }
+
+prompt: |
+  You are Note Assistant.
+  Your primary goal is to create a well-structured note object.
+  If the user provides a URL, consider using the `fetch_web_content` tool to get its content to include in the note body.
+  If the user provides an image URL, consider using the `recognize_image_content` tool to get a description to include in the note body.
+  After gathering all necessary information, transform it into a Note object that conforms to the schema.
+  Then call `state.create` with:
+    schema_uri = "did:nuwa:state:note#v1"
+    object     = <the JSON object for the note>
+  If you use a tool like `fetch_web_content` or `recognize_image_content`, use its output to enrich the note's body.
+  Always set the `source_url` field in the note object if the note is about a specific webpage or image.
+  Reply only with the final `state.create` tool call, or an intermediate tool call if you need more information.
+
+tools:
+  - type: function
+    function:
+      name: state.create        # built-in tool
+      description: Persist a new state object (a note).
+      parameters:
+        type: object
+        properties:
+          schema_uri: {type: string, enum: ["did:nuwa:state:note#v1"]}
+          object:     {$ref: "#/schema"}
+        required: [schema_uri, object]
+  - type: function
+    function:
+      name: fetch_web_content
+      description: "Fetches the main textual content from a given web page URL. Useful for summarizing or taking notes about online articles."
+      parameters:
+        type: object
+        properties:
+          url: {type: string, format: uri, description: "The URL of the web page to fetch content from."}
+        required: [url]
+  - type: function
+    function:
+      name: recognize_image_content
+      description: "Analyzes an image from a given URL and returns a textual description of its content. Useful for adding context about an image to a note."
+      parameters:
+        type: object
+        properties:
+          image_url: {type: string, format: uri, description: "The URL of the image to analyze."}
+        required: [image_url]
+
+tool_bindings:
+  "fetch_web_content":
+    type: "mcp_service"
+    service_uri: "did:nuwa:mcp:webscraper:version1" # Example MCP service URI
+    mcp_action: "extract_text_content"
+    # Arguments from LLM tool call (e.g., {url: "..."}) are passed as payload to MCP action.
+  "recognize_image_content":
+    type: "mcp_service"
+    service_uri: "did:nuwa:mcp:visiondescribers:stable" # Example MCP service URI
+    mcp_action: "describe_image_from_url"
+    # Arguments from LLM tool call (e.g., {image_url: "..."}) are passed as payload.
+# ========= End of ACP =========
+```
+
+#### Field rules
+
+| Field         | Rule                                                                              |
+| ------------- | --------------------------------------------------------------------------------- |
+| `metadata.id` | MUST be a `Capability URI` (semantic-versioned DID). The `<name>` part of this URI, in conjunction with the `did:nuwa:cap` prefix, ensures global uniqueness for the capability's identity, managed by the registry contract. |
+| `schema.$id`  | MUST be a `Schema URI`; `state.*` calls use it as `schema_uri`.                   |
+| `triggers`    | Array of regex / keyword / embedding hashes; Router uses them for intent routing. |
+| `metadata.llm_requirements` | Optional. An object specifying dependencies on LLM models or features. Fields can include `model_family` (array of strings, e.g., "gpt-4", "claude-2"), `specific_model_uri` (string, e.g., a DID or URL pointing to a specific model), `min_context_window` (integer), `required_features` (array of strings, e.g., "function_calling_json_mode"). The Router SHOULD attempt to satisfy these requirements if specified. |
+| `signature`   | Author signs `sha256(file)` with a key in their DID Document.                     |
+
+#### Tool Bindings (`tool_bindings`)
+
+The optional `tool_bindings` section provides the Nuwa runtime with instructions on how to execute tools declared in the `tools` section that are not built-in (e.g., `state.*` family). If a tool declared in `tools` is not a built-in and does not have a corresponding entry in `tool_bindings`, the runtime may not be able to execute it.
+
+This section is a YAML map where:
+*   Each key is a `function.name` exactly as it appears in the `tools` section.
+*   Each value is an object specifying the `type` of the binding and type-specific parameters.
+
+Supported `type` values include (but are not limited to):
+*   `http_get`: For making HTTP GET requests.
+    *   `url`: The target URL. Arguments from the LLM tool call are typically appended as query parameters.
+*   `http_post`: For making HTTP POST requests.
+    *   `url`: The target URL. Arguments from the LLM tool call are typically sent as a JSON body.
+*   `nuwa_a2a`: For making an Agent-to-Agent call using Nuwa's A2A protocols (e.g., NIP-2, NIP-3).
+    *   `target_did`: The DID of the target Nuwa agent.
+    *   `service_method`: The name of the service or method to invoke on the target agent. Arguments are passed as the payload.
+*   `mcp_service`: For interacting with a service using the Model Context Protocol (MCP).
+    *   `service_uri`: The URI of the MCP service.
+    *   `mcp_action`: The specific action to perform on the MCP service. Arguments are passed as the payload.
+
+**Example `tool_bindings`:**
+
+```yaml
+# ========= Agent Capability Package (ACP) Example with Tool Bindings =========
+metadata:
+  id: did:nuwa:cap:weatherreporter@1.0.0
+  name: "Weather Reporter"
+  description: "Provides weather forecasts and can message contacts."
+  triggers:
+    - {type: regex, value: "weather|forecast"}
+  memory_scope: sc:weather
+  permissions:
+    require: [] # This capability might not use state.* tools directly
+
+schema: |
+  {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "did:nuwa:state:weatherreporter#v1",
+    "type": "object",
+    "properties": {
+      "lastForecastLocation": {"type": "string"}
     }
-    // ... other services offered by the DID subject ...
-  ]
-}
+  }
+
+prompt: |
+  You are a helpful weather assistant.
+  Use the available tools to fetch weather information or send messages.
+
+tools:
+  - type: function
+    function:
+      name: "get_current_weather"
+      description: "Get the current weather in a given location"
+      parameters:
+        type: object
+        properties:
+          location: {type: string, description: "The city and state, e.g., San Francisco, CA"}
+          unit: {type: string, enum: [celsius, fahrenheit], default: "celsius"}
+        required: [location]
+  - type: function
+    function:
+      name: "send_notification"
+      description: "Sends a notification message to a contact."
+      parameters:
+        type: object
+        properties:
+          contact_did: {type: string, description: "The DID of the Nuwa agent to notify."}
+          message: {type: string, description: "The message content."}
+        required: [contact_did, message]
+
+tool_bindings:
+  "get_current_weather":
+    type: "http_get"
+    url: "https://api.open-meteo.com/v1/forecast" # Example public API
+    # The runtime would map 'location' (needs geocoding first, or API supports city name)
+    # and 'unit' to appropriate query parameters for this specific API.
+    # For simplicity, this example assumes direct mapping or runtime intelligence.
+    # A more advanced spec might include parameter mapping rules here.
+
+  "send_notification":
+    type: "nuwa_a2a"
+    target_did: "{contact_did}" # Placeholder, resolved from LLM arguments at runtime
+    service_method: "receiveSimpleMessage"
+# ========= End of ACP =========
 ```
 
-Clients discover Fiat Proxy services by resolving their DIDs and looking for service entries with `type: "FiatProxyServiceNIP5"`. The `serviceEndpoint` URI is then used to interact with the Proxy's API.
+### Runtime behaviour
 
-### Fiat Proxy API (off-chain)
+1.  **Install**
 
-All API requests to the Fiat Proxy `serviceEndpoint` MUST be authenticated according to the **NIP-2: DID-Based Authentication Protocol**. Specifically, clients (AI Agents) MUST use the HTTP-based authentication mechanism defined in NIP-2, which involves sending an `Authorization` header with the `DIDAuthV1 <credentials>` scheme. The `<credentials>` are a Base64url encoded JSON string containing the `signer_did`, `key_id`, and `signature_value` over the relevant parts of the request, as detailed in NIP-2.
+   * Router downloads the `.acp.yaml` via CID, verifies `signature`, caches file.
+2.  **Route**
 
-The `contentToSign` for NIP-2 authentication in the context of NIP-5 API calls MUST include the full HTTP request body and a `timestamp` and `nonce` as specified in NIP-2 to prevent replay attacks. The `domainSeparator` for NIP-5 should be a clearly defined string like `"NUWA_FIAT_PROXY_NIP5_V1:"`.
+   * For each user message, Router:
 
-#### Endpoints
+     * checks explicit `/back`, `/switch`;
+     * else tests top-of-stack capability;
+     * else classifies message with `triggers` of installed capabilities.
+3.  **Execute**
 
-*(Note: The following API endpoints are illustrative. Specific implementations may vary but should cover these core functionalities. Fiat Proxy providers should publish detailed API documentation. All endpoints require NIP-2 authentication.)*
+    *   Router passes message + section `prompt` + `tools` (the interface definitions) to LLM.
+    *   LLM emits a tool call (e.g., `state.*` or a custom tool name from the `tools` manifest).
+    *   **Tool Resolution & Execution**:
+        *   If the tool name is a built-in (e.g., `state.create`), the runtime executes it directly. The object is validated against the capability's `schema` if applicable (e.g., for `state.create`).
+        *   Else, the runtime looks up the tool name in the `tool_bindings` section of the ACP.
+            *   If a binding is found, the runtime uses the specified `type` (e.g., `http_get`, `nuwa_a2a`, `mcp_service`) and associated parameters (e.g., `url`, `target_did`) to execute the tool call, passing the arguments provided by the LLM.
+            *   If no binding is found and the tool is not built-in, the tool call cannot be fulfilled (this should be treated as an error or a specific response to the LLM).
+    *   For `state.*` tools, runtime persists via CR-SQLite / RocksDB + CRDT log.
+4.  **Done / pop**
 
-1.  **`POST /payments/initiate`**
-    *   Allows an AI Agent to request the initiation of a fiat payment.
-    *   **Request Body (example):**
-        ```json
-        {
-          "agent_did": "did:example:agent:xyz", // This is implicitly verified by NIP-2's signer_did
-          "recipient_details": {
-            "type": "bank_account", // or "paypal_email", "crypto_address_for_stablecoin", etc.
-            "account_number": "...",
-            "routing_number": "...",
-            "beneficiary_name": "..."
-          },
-          "amount": "100.00",
-          "currency": "USD",
-          "memo": "Payment for services rendered by Agent XYZ",
-          "timestamp": 1678886400, // Unix timestamp, part of contentToSign for NIP-2
-          "nonce": "a1b2c3d4e5f67890" // Unique random string, part of contentToSign for NIP-2
-        }
-        ```
-    *   **Response Body (example - success):**
-        ```json
-        {
-          "payment_id": "txn_123abc",
-          "status": "pending", // or "processing", "requires_action"
-          "details": "Payment initiated successfully."
-        }
-        ```
+   * If tool response contains `{"done":true}` *or* Router times out / re-classifies, stack pops.
 
-2.  **`GET /payments/{payment_id}/status`**
-    *   Allows an AI Agent to check the status of a previously initiated payment.
-    *   **Path Parameter:**
-        *   `payment_id`: The ID of the payment returned by the initiate endpoint.
-    *   **Request Construction for NIP-2:** The `contentToSign` for NIP-2 would include relevant request parameters like `payment_id`, a `timestamp`, and a `nonce`. These might be passed as query parameters or in the body if applicable, or constructed as per NIP-2 guidelines for GET requests.
-    *   **Response Body (example - success):**
-        ```json
-        {
-          "payment_id": "txn_123abc",
-          "status": "completed", // or "pending", "failed", "refunded"
-          "timestamp": "2025-05-15T10:30:00Z",
-          "transaction_details": { /* ... specific details from payment processor ... */ }
-        }
-        ```
+### Built-in storage tools (`state.*`)
 
-### Discovery and Interaction Flow
+| Tool           | Purpose            | Notes                                |
+| -------------- | ------------------ | ------------------------------------ |
+| `state.create` | Insert full object | Generates CRDT “create” op.          |
+| `state.update` | JSON-Patch diff    | Fields merged per `x-crdt` strategy. |
+| `state.query`  | Mongo-like filter  | Returns stream / pageable cursor.    |
+| `state.delete` | Soft/Hard delete   | Mode governed by permission scope.   |
 
-```mermaid
-sequenceDiagram
-    participant Agent as AI Agent (DID)
-    participant ClientApp as Client Application/User
-    participant ProxyDID as Fiat Proxy (DID Resolution)
-    participant ProxyAPI as Fiat Proxy API
-    participant PaymentGateway as External Payment Gateway
+A capability MUST declare required CRUD verbs in `metadata.permissions.require`.
+The detailed mechanics of state persistence, `memory_scope` isolation, and the issuance of permission tokens (e.g., ZCAP-LD) for these tools may be further elaborated in a dedicated NIP.
 
-    ClientApp->>Agent: Request to make a payment
-    Agent->>Agent: Identify need for Fiat Proxy
-    Agent->>ProxyDID: Resolve Fiat Proxy DID (e.g., did:example:fiatproxy456)
-    ProxyDID-->>Agent: Fiat Proxy DID Document
-    Agent->>Agent: Parse service endpoint for "FiatProxyServiceNIP5"
-    Agent->>ProxyAPI: POST /payments/initiate (Authenticated per NIP-2)
-    ProxyAPI->>ProxyAPI: Verify Agent's signature (as per NIP-2)
-    ProxyAPI->>ProxyAPI: Perform KYC/AML checks if necessary
-    ProxyAPI->>PaymentGateway: Initiate payment via PSP APIs
-    PaymentGateway-->>ProxyAPI: Payment status (e.g., pending)
-    ProxyAPI-->>Agent: { payment_id, status: "pending" }
-    ClientApp->>Agent: (Later) Check payment status
-    Agent->>ProxyAPI: GET /payments/{payment_id}/status (Authenticated per NIP-2)
-    ProxyAPI->>PaymentGateway: Query payment status
-    PaymentGateway-->>ProxyAPI: Payment status (e.g., completed)
-    ProxyAPI-->>Agent: { payment_id, status: "completed", details }
-    Agent-->>ClientApp: Payment completed
-```
+### Registry Interaction Model
+
+The Capability Registry system facilitates the discovery and resolution of ACPs.
+**Publishing** new capabilities or versions is a **client-side action** involving direct interaction with the underlying blockchain. This action results in on-chain events.
+**Discovery and Resolution** are handled by Registry Indexing Services, which listen to these on-chain events, fetch ACP files from IPFS, and build a searchable index. These services SHOULD expose their query functionalities via the **Model Context Protocol (MCP)**.
+
+#### Client-Side Publishing Actions
+
+| Action                | Description                                                                 | Initiator         |
+| --------------------- | --------------------------------------------------------------------------- | ----------------- |
+| `Publish New Version` | Client-side action: package ACP, sign, upload to IPFS, and submit essential registration data (specifically `cap_uri`, `semver`, `cid` of the ACP file on IPFS, and `sha256` hash of the ACP file) to the blockchain. Requires DID authentication by the author. The full ACP YAML is stored on IPFS, not directly on-chain. | Client (e.g., CLI)|
+| `Vote on Capability`  | Client-side action: submit a vote related to a capability\'s governance to a relevant smart contract. (Optional DAO model). | Client (e.g., CLI)|
+
+On-chain implementations (e.g., the `acp-registry-contract`) MUST store at least the `cap_uri`, `semver`, `cid` (Content Identifier for the ACP file on IPFS), and `sha256` (hash of the ACP file for integrity verification). Upon successful publication of a new capability version, the contract MUST emit an event containing these four pieces of information.
+
+#### Registry MCP Service Interface (for Discovery & Resolution)
+
+Registry Indexing Services provide an MCP interface for clients to find and retrieve ACP information. Example MCP actions include:
+
+| MCP Service Action      | Description                                                                 | Input Parameters (example) | Output (example)                                  |
+| ----------------------- | --------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------- |
+| `resolve_capability`    | Resolves the latest (or specific version) of an ACP, returning its metadata and IPFS CID. | `cap_uri: string`          | `{ acp_metadata: object, ipfs_cid: string }` or error |
+| `search_capabilities`   | Performs a full-text or semantic search over indexed ACP metadata.          | `query_string: string`, `filters: map` (optional) | `list_of_results: [{ acp_metadata: object, ipfs_cid: string }, ...]` or error |
+
+Clients would use an SDK to make authenticated (if required by the MCP service, per NIP-7) calls to these MCP actions. The `acp_metadata` in the output would typically be the `metadata` section of the ACP YAML.
 
 ## Rationale
 
-**DID-based Service Discovery:**
-Using DID documents for service discovery aligns NIP-5 with NIP-1 and NIP-3, promoting a consistent, decentralized approach. Fiat Proxy providers can advertise their capabilities (supported currencies, regions, etc.) directly within their DIDs, allowing agents or their users to select appropriate proxies.
+This section explains the "why" behind the design choices in the "Specification" section.
+*   Alternative designs considered and why they were not chosen.
+*   Related work or prior art.
+*   Evidence of community consensus or address significant objections.
 
-**Agent-Centric Authentication (via NIP-2):**
-By mandating NIP-2 for authentication, NIP-5 ensures that actions are authorized by the AI Agent's DID in a standardized and secure manner. This leverages the general-purpose DID authentication mechanism, enhancing security and accountability.
-
-**Abstraction of Complexity:**
-The Fiat Proxy handles the complexities of interacting with various payment gateways, managing credentials, and dealing with compliance requirements. This simplifies the development of AI Agents that need fiat payment capabilities.
+(To be defined)
 
 ## Backwards Compatibility
 
-This NIP defines a new service type and discovery mechanism. Systems not aware of `FiatProxyServiceNIP5` in DID documents will not be able to discover or interact with these services. Authentication relies on NIP-2; clients and services must implement NIP-2.
+Monolithic agents (pre-ACP) remain functional: Router falls back when no capability is triggered.
+Schema version upgrades follow SemVer; incompatible changes require new `Schema URI`.
 
 ## Test Cases
 
-*   **Fiat Proxy Discovery:**
-    *   Client resolves a Fiat Proxy's DID.
-    *   Client successfully finds the `FiatProxyServiceNIP5` entry in the `service` array.
-    *   Client correctly parses `serviceEndpoint` and `metadata` (e.g., `supported_currencies`).
-*   **Payment Initiation (NIP-2 Auth):**
-    *   Agent successfully authenticates (per NIP-2) and initiates a payment request to the Proxy.
-    *   Proxy validates the NIP-2 authentication and the request, then returns a `payment_id` with `pending` status.
-    *   Proxy correctly rejects requests with invalid NIP-2 authentication or malformed payment requests.
-*   **Payment Status Check (NIP-2 Auth):**
-    *   Agent successfully authenticates (per NIP-2) and queries the status of a payment using `payment_id`.
-    *   Proxy returns the correct status (e.g., `completed`, `failed`).
-
-<!-- TODO: Add more detailed Test Cases or link to a test suite -->
 
 ## Reference Implementation
 
-<!-- TODO: Add Reference Implementation link -->
+<!-- placeholder for a link to the reference implementation (e.g., a GitHub repository or branch) -->
 
 ## Security Considerations
 
-*   **Authentication Security:** All security considerations from NIP-2 regarding DID resolution, key management, signature verification, replay attack prevention (timestamps, nonces), domain separation, and transport security (TLS/HTTPS) are directly applicable and critical for NIP-5.
-*   **Agent Key Security:** The AI Agent's private key used for signing requests (as per NIP-2) must be securely managed. Compromise of this key could lead to unauthorized payment initiations.
-*   **Fiat Proxy Trust:** Users and agents trust the Fiat Proxy to:
-    *   Securely handle payment information.
-    *   Accurately process payments and report status.
-    *   Comply with relevant financial regulations.
-    The selection of a reputable Fiat Proxy is crucial. DID-based discovery allows for transparency, but due diligence is still required.
-*   **Replay Attacks:** API designs should incorporate measures to prevent replay attacks (e.g., nonces, timestamps in signed payloads).
-*   **Data Privacy:** Fiat Proxies will handle sensitive data. Their privacy policies and data protection measures should be clearly communicated and robust.
-*   **Compliance:** Fiat Proxy services operate in a regulated space. They are responsible for adhering to KYC/AML and other financial regulations. Agents using these proxies indirectly benefit from this compliance layer.
-
-## References
-
-1.  **NIP-1: Decentralized Identifiers for AI Agents**
-2.  **NIP-2: DID-Based Authentication Protocol**
-3.  **NIP-3: Custodian Delegated Control Protocol** (Agents might be created via NIP-3, then use NIP-5 services)
-4.  **ISO 4217 Currency Codes**
-5.  **ISO 3166-1 Alpha-2 Country Codes**
-6.  **JSON Web Signature (JWS) - RFC 7515**
-7.  **HTTP Signatures (IETF Draft)**
+* **Signature validation** — Router MUST reject unsigned or invalid packages.
+* **Sand-boxing** — Tool invocations run in WASM / container with least privilege.
+* **Permission tokens** — Runtime issues ZCAP-LD (Authorization Capabilities for Linked Data, a decentralized authorization standard) tokens scoped to `memory_scope`.
+* **Prompt-injection** — Router SHOULD lint `prompt` for forbidden patterns before mounting.
 
 ## Copyright
 
