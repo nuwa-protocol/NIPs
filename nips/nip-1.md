@@ -81,11 +81,11 @@ Secure management and reliable recovery of master keys are critical.
 A core principle for the ecosystem is to enable simple and standardized discovery of services offered by Agents. NIP-1 establishes the use of the `service` property within a DID document as the **standard mechanism for service declaration and discovery**.
 
 -   **Service Declaration**: Any Agent (user or service provider) that offers a service discoverable by other Agents MUST declare these services within the `service` array of its DID document.
--   **Standardized Service Types**: Each NIP that defines a specific service (e.g., a Fiat Proxy service as in NIP-5, an LLM Gateway as in NIP-9) MUST specify a unique `type` string for that service (e.g., `"FiatProxyServiceNIP5"`, `"LLMGatewayNIP9"`, `"CadopCustodianService"`, `"CadopWeb2ProofService"`, `"CadopIdPService"`). This `type` is used in the `service.type` field of the service entry.
+-   **Standardized Service Types**: Each NIP that defines a specific service (e.g., an LLM Gateway as in NIP-6, an MCP service as in NIP-7) MUST specify a unique `type` string for that service (e.g., `"LLMGatewayNIP6"`, `"MCPServiceNIP7"`, `"CadopCustodianService"`, `"CadopWeb2ProofService"`, `"CadopIdPService"`). This `type` is used in the `service.type` field of the service entry.
 
     To ensure clarity and uniqueness, service types within this ecosystem should follow one of the following naming conventions:
     *   **For services that are integral components of a larger, named protocol (e.g., a protocol defined by a NIP or a set of NIPs)**: The service `type` should be prefixed with an abbreviation or a well-known name of the protocol, followed by the specific role of the service. Example: `CadopCustodianService`, where "Cadop" refers to the Custodian-Assisted DID Onboarding Protocol.
-    *   **For services defined by a specific NIP that are more standalone or represent a specific version/instance of a general service concept**: The service `type` should combine a descriptive name of the service concept with a suffix indicating the NIP number that defines it. Example: `FiatProxyServiceNIP5`, indicating a Fiat Proxy service as defined in NIP-5.
+    *   **For services defined by a specific NIP that are more standalone or represent a specific version/instance of a general service concept**: The service `type` should combine a descriptive name of the service concept with a suffix indicating the NIP number that defines it. Example: `LLMGatewayNIP6`, indicating an LLM Gateway service as defined in NIP-6.
     
     This approach ensures that service types are both descriptive and directly linkable to their defining specifications.
 

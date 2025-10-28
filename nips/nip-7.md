@@ -1,341 +1,136 @@
 ---
 nip: 7
-title: Agent Capability Protocol — Capability Package Specification
+title: MCP Identity Authentication and Payment Extension Protocol
 author: jolestar(@jolestar)
-discussions-to: https://github.com/nuwa-protocol/NIPs/discussions/8
 status: Draft
 type: Standards Track
 category: Core
 created: 2025-05-13
 updated: 2025-05-18
-requires: NIP-1
+requires: NIP-1, NIP-2, NIP-4
 ---
 
 ## Abstract
 
-*Agent Capability Protocol* (ACP) defines how an **Agent Capability Package** (file suffix **`.acp.yaml`**) bundles:
-
-* a **JSON Schema** that formalises the state objects this capability owns;
-* a **canonical prompt** (system/assistant template) that instructs an LLM how to use the capability;
-* a **tool manifest** (OpenAI Tools format) that maps user intent to runtime functions;
-* descriptive **metadata** (ID, triggers, permissions, signature).
-
-A single ACP file can be published to a decentralised **Capability Registry**, discovered by any Nuwa-compatible Router, installed at runtime, and cleanly removed or upgraded.
-State persistence is performed via the standard `state.*` tool family provided by the Nuwa runtime.
+This NIP proposes extensions to the Model Context Protocol (MCP) to include standard mechanisms for identity authentication and payment. This will enable MCP services to be commercialized securely, protect resources, and allow existing MCP clients and servers to more easily integrate these features.
 
 ## Motivation
 
-Current agents are monolithic: a huge prompt plus ad-hoc tools. Scaling to dozens of tasks explodes context size and tangles memory. ACP makes each task a plug-in that can be:
-
-* **installed / uninstalled on demand**,
-* **hot-swapped** inside one chat session via a Router stack,
-* **independently versioned & governed**,
-* **securely sandboxed** with least-privilege storage calls.
+*   The current Model Context Protocol (MCP) primarily focuses on the interaction between models and tools, lacking standard mechanisms for identity authentication and payment.
+*   To enable MCP services to be commercialized securely and to protect resources, it is necessary to introduce these capabilities at the protocol level.
+*   By directly extending MCP, rather than relying entirely on A2A encapsulation, existing MCP clients and servers can more easily integrate these features, thus better fitting into the MCP ecosystem.
 
 ## Specification
 
-### Terminology
+This NIP extends MCP with identity authentication and payment capabilities.
 
-| Term               | Meaning                                                                      |
-| ------------------ | ---------------------------------------------------------------------------- |
-| **ACP file**       | The single YAML document that ships one capability.                          |
-| **Capability URI** | `did:nuwa:cap:<name>@<semver>` — globally unique ID for the package. The `<name>` component MUST be unique within the `did:nuwa:cap` namespace to ensure the URI's global uniqueness. |
-| **Schema URI**     | `$id` of the JSON Schema, usually `did:nuwa:state:<name>#<ver>`.             |
-| **Router**         | Top-level agent component that routes messages to sub-agents (capabilities). |
-| **Registry**       | Decentralised index (chain + IPFS) that stores ACP metadata & file CIDs.     |
+### Dependencies
 
-### File format (`.acp.yaml`)
+*   **NIP-1: Agent Single DID Multi-Key Model**: Used to define the identity identifiers for MCP clients and servers.
+*   **(Conceptual Dependency) NIP-2: DID-Based A2A Authentication**: The authentication principles from NIP-2 (e.g., using DID signatures to verify request origin and integrity) will be adopted and applied to MCP messages.
+*   **(Conceptual Dependency) NIP-4: A2A Agent Service Payment Protocol**: The payment flows and message types from NIP-4 will be adapted for payment interactions within MCP.
 
-#### Top-level sections
+### MCP Identity Authentication Extension
 
-```yaml
-metadata:       | required | ACP & trigger info, including optional LLM requirements
-schema:         | required | JSON-Schema 2020-12 (string block)
-prompt:         | optional | Markdown or plain-text template (string block)
-tools:          | optional | Tool list (YAML array, OpenAI format) - Interface for LLM
-tool_bindings:  | optional | Defines execution for non-built-in tools - Implementation for Runtime
-```
+*   **3.1. Identity Identifiers and Service Declaration**:
+    *   Both MCP clients and MCP servers should possess a DID compliant with NIP-1 specifications.
+    *   MCP servers must declare their service endpoint(s) and associated DID within their DID Document, following the service endpoint definition guidelines specified in NIP-1. This allows clients to discover MCP services and verify their authenticity.
+    *   The service type for MCP services, to be used in the `service.type` field of the DID document, should be `"MCPServiceV1"`. Other service-specific metadata relevant to MCP may also be included as defined by the broader MCP specification.
+*   **3.2. Request Signing**:
+    *   MCP clients, when initiating tool call requests, must sign critical parts of the request according to the procedures outlined in NIP-2. 
+    *   The `contentToSign` (as defined in NIP-2) for an MCP request comprises the canonicalized MCP request payload. This payload **must** include a `timestamp` and a `nonce` as top-level fields for replay protection, adhering to NIP-2 requirements. The specific canonicalization method for the MCP request payload should be defined by the MCP standard.
+    *   The `domainSeparator` for NIP-2 signatures in the context of NIP-7 should be `"MCP_NIP7_AUTH_V1:"`.
+    *   Signature information (including client DID, `key_id` used, and signature value) can be transmitted via MCP request metadata or as part of the request body. 
+    *   When MCP is layered over HTTP, the signature information should be transmitted using the HTTP Header mechanism defined in NIP-2 (e.g., `Authorization: DIDAuthV1 <credentials>`). This NIP does not define a new signature header.
+*   **3.3. Server-side Verification**:
+    *   Upon receiving a request, the MCP server parses the signature information to obtain the client's DID, following NIP-2.
+    *   It resolves the client's DID to retrieve its DID document and the corresponding public key.
+    *   It verifies the signature's validity, ensuring the request is untampered and originates from a legitimate client.
+    *   (Optional) Access control can be enforced based on the client's DID.
 
-#### Minimal example
+### MCP Payment Extension
 
-```yaml
-# ========= Agent Capability Package =========
-metadata:
-  id: did:nuwa:cap:note@1.0.0
-  name: "Note"
-  description: "Create & manage personal notes, optionally fetching content from web pages or describing images."
-  triggers:
-    - {type: regex, value: "记(.*)笔记|note|add note about"}
-  memory_scope: sc:note
-  permissions:
-    require: ["state.create", "state.update", "state.query"]
-  llm_requirements: # Optional: Specify LLM dependencies
-    model_family: ["gpt-4", "claude-3"] # Suggests compatibility with these model families
-    min_context_window: 16000 # Example: requires at least 16k context window
-    # Other potential fields: specific_model_uri, required_features: ["tool_use_json_mode"]
-  signature: zDIDSig1xyz…          # sha256 over whole file, signed by author DID key
+*   **4.1. Service Pricing and Quotation**:
+    *   MCP servers should be able to declare whether their tools (or specific operations) require payment and their pricing strategy. This can be achieved by extending MCP's tool descriptions.
+    *   **MCP Message Extension - `ToolQuotationRequest`**: Client requests a quotation for a specific tool call from the server.
+        *   Includes: `tool_id`, `tool_input` (for precise server-side quotation).
+    *   **MCP Message Extension - `ToolQuotationResponse`**: Server replies with the quotation.
+        *   Includes: `quotation_id`, `price` (amount, currency unit), `payment_instructions`. 
+        *   `payment_instructions` should detail the required payment method (e.g., direct on-chain transfer to a specified address, or indication if an NIP-4 payment channel can be used for settlement). If direct payment, it includes necessary details like `chain_id`, `asset_id`, `recipient_address`.
+*   **4.2. Payment Confirmation and Service Execution (Pre-payment Model)**:
+    *   The client completes the payment according to the `payment_instructions` in the `ToolQuotationResponse`.
+    *   **MCP Message Extension - `PaymentConfirmation`**: Client sends payment confirmation to the server.
+        *   Includes: `quotation_id`, `payment_proof`. 
+        *   `payment_proof` contains evidence of the payment (e.g., for a direct on-chain payment, this would include `transaction_hash`, `block_number`). If an NIP-4 channel is used by agreement after quotation, this message might be superseded or augmented by NIP-4 channel update messages.
+    *   The server verifies the payment proof.
+    *   Upon successful verification, the server executes the actual MCP tool call and returns the result.
+*   **4.3. State Channel Payment Model (Optional, for frequent/streaming interactions)**:
+    *   For frequent or streaming interactions, MCP can leverage the state channel payment mechanisms defined in NIP-4. This includes protocols for channel establishment, funding, state updates, and closure.
+    *   Implementations should refer to NIP-4 for specific A2A message definitions and flows for channel management. 
+    *   If MCP interactions are layered over HTTP, the `X-Payment-Channel-Data` header mechanism defined in NIP-4 should be used to convey channel payment information (proposals and confirmations) within HTTP requests and responses.
+    *   Once a payment channel is established according to NIP-4, subsequent MCP tool calls can indicate billing via this specific payment channel in their requests, using a mechanism compatible with both MCP and NIP-4 (e.g., by referencing a channel ID in MCP request metadata or as part of the `X-Payment-Channel-Data` header if over HTTP).
 
-schema: |
-  { "$schema":"https://json-schema.org/draft/2020-12/schema",
-    "$id":"did:nuwa:state:note#v1",
-    "type":"object",
-    "properties":{
-      "id":{"type":"string","format":"uuid"},
-      "title":{"type":"string","x-crdt":"lww_register"},
-      "body":{"type":"string","x-crdt":"rga_text"},
-      "source_url":{"type":"string","format":"uri", "description":"Optional URL of the source webpage or image."},
-      "tags":{"type":"array","items":{"type":"string"},"x-crdt":"grow_only_set"},
-      "createdAt":{"type":"string","format":"date-time"},
-      "updatedAt":{"type":"string","format":"date-time"}
-    },
-    "required":["id","title","body","createdAt","updatedAt"]
-  }
+### MCP Protocol Modifications and Message Definitions
 
-prompt: |
-  You are Note Assistant.
-  Your primary goal is to create a well-structured note object.
-  If the user provides a URL, consider using the `fetch_web_content` tool to get its content to include in the note body.
-  If the user provides an image URL, consider using the `recognize_image_content` tool to get a description to include in the note body.
-  After gathering all necessary information, transform it into a Note object that conforms to the schema.
-  Then call `state.create` with:
-    schema_uri = "did:nuwa:state:note#v1"
-    object     = <the JSON object for the note>
-  If you use a tool like `fetch_web_content` or `recognize_image_content`, use its output to enrich the note's body.
-  Always set the `source_url` field in the note object if the note is about a specific webpage or image.
-  Reply only with the final `state.create` tool call, or an intermediate tool call if you need more information.
-
-tools:
-  - type: function
-    function:
-      name: state.create        # built-in tool
-      description: Persist a new state object (a note).
-      parameters:
-        type: object
-        properties:
-          schema_uri: {type: string, enum: ["did:nuwa:state:note#v1"]}
-          object:     {$ref: "#/schema"}
-        required: [schema_uri, object]
-  - type: function
-    function:
-      name: fetch_web_content
-      description: "Fetches the main textual content from a given web page URL. Useful for summarizing or taking notes about online articles."
-      parameters:
-        type: object
-        properties:
-          url: {type: string, format: uri, description: "The URL of the web page to fetch content from."}
-        required: [url]
-  - type: function
-    function:
-      name: recognize_image_content
-      description: "Analyzes an image from a given URL and returns a textual description of its content. Useful for adding context about an image to a note."
-      parameters:
-        type: object
-        properties:
-          image_url: {type: string, format: uri, description: "The URL of the image to analyze."}
-        required: [image_url]
-
-tool_bindings:
-  "fetch_web_content":
-    type: "mcp_service"
-    service_uri: "did:nuwa:mcp:webscraper:version1" # Example MCP service URI
-    mcp_action: "extract_text_content"
-    # Arguments from LLM tool call (e.g., {url: "..."}) are passed as payload to MCP action.
-  "recognize_image_content":
-    type: "mcp_service"
-    service_uri: "did:nuwa:mcp:visiondescribers:stable" # Example MCP service URI
-    mcp_action: "describe_image_from_url"
-    # Arguments from LLM tool call (e.g., {image_url: "..."}) are passed as payload.
-# ========= End of ACP =========
-```
-
-#### Field rules
-
-| Field         | Rule                                                                              |
-| ------------- | --------------------------------------------------------------------------------- |
-| `metadata.id` | MUST be a `Capability URI` (semantic-versioned DID). The `<name>` part of this URI, in conjunction with the `did:nuwa:cap` prefix, ensures global uniqueness for the capability's identity, managed by the registry contract. |
-| `schema.$id`  | MUST be a `Schema URI`; `state.*` calls use it as `schema_uri`.                   |
-| `triggers`    | Array of regex / keyword / embedding hashes; Router uses them for intent routing. |
-| `metadata.llm_requirements` | Optional. An object specifying dependencies on LLM models or features. Fields can include `model_family` (array of strings, e.g., "gpt-4", "claude-2"), `specific_model_uri` (string, e.g., a DID or URL pointing to a specific model), `min_context_window` (integer), `required_features` (array of strings, e.g., "function_calling_json_mode"). The Router SHOULD attempt to satisfy these requirements if specified. |
-| `signature`   | Author signs `sha256(file)` with a key in their DID Document.                     |
-
-#### Tool Bindings (`tool_bindings`)
-
-The optional `tool_bindings` section provides the Nuwa runtime with instructions on how to execute tools declared in the `tools` section that are not built-in (e.g., `state.*` family). If a tool declared in `tools` is not a built-in and does not have a corresponding entry in `tool_bindings`, the runtime may not be able to execute it.
-
-This section is a YAML map where:
-*   Each key is a `function.name` exactly as it appears in the `tools` section.
-*   Each value is an object specifying the `type` of the binding and type-specific parameters.
-
-Supported `type` values include (but are not limited to):
-*   `http_get`: For making HTTP GET requests.
-    *   `url`: The target URL. Arguments from the LLM tool call are typically appended as query parameters.
-*   `http_post`: For making HTTP POST requests.
-    *   `url`: The target URL. Arguments from the LLM tool call are typically sent as a JSON body.
-*   `nuwa_a2a`: For making an Agent-to-Agent call using Nuwa's A2A protocols (e.g., NIP-2, NIP-3).
-    *   `target_did`: The DID of the target Nuwa agent.
-    *   `service_method`: The name of the service or method to invoke on the target agent. Arguments are passed as the payload.
-*   `mcp_service`: For interacting with a service using the Model Context Protocol (MCP).
-    *   `service_uri`: The URI of the MCP service.
-    *   `mcp_action`: The specific action to perform on the MCP service. Arguments are passed as the payload.
-
-**Example `tool_bindings`:**
-
-```yaml
-# ========= Agent Capability Package (ACP) Example with Tool Bindings =========
-metadata:
-  id: did:nuwa:cap:weatherreporter@1.0.0
-  name: "Weather Reporter"
-  description: "Provides weather forecasts and can message contacts."
-  triggers:
-    - {type: regex, value: "weather|forecast"}
-  memory_scope: sc:weather
-  permissions:
-    require: [] # This capability might not use state.* tools directly
-
-schema: |
-  {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "did:nuwa:state:weatherreporter#v1",
-    "type": "object",
-    "properties": {
-      "lastForecastLocation": {"type": "string"}
-    }
-  }
-
-prompt: |
-  You are a helpful weather assistant.
-  Use the available tools to fetch weather information or send messages.
-
-tools:
-  - type: function
-    function:
-      name: "get_current_weather"
-      description: "Get the current weather in a given location"
-      parameters:
-        type: object
-        properties:
-          location: {type: string, description: "The city and state, e.g., San Francisco, CA"}
-          unit: {type: string, enum: [celsius, fahrenheit], default: "celsius"}
-        required: [location]
-  - type: function
-    function:
-      name: "send_notification"
-      description: "Sends a notification message to a contact."
-      parameters:
-        type: object
-        properties:
-          contact_did: {type: string, description: "The DID of the Nuwa agent to notify."}
-          message: {type: string, description: "The message content."}
-        required: [contact_did, message]
-
-tool_bindings:
-  "get_current_weather":
-    type: "http_get"
-    url: "https://api.open-meteo.com/v1/forecast" # Example public API
-    # The runtime would map 'location' (needs geocoding first, or API supports city name)
-    # and 'unit' to appropriate query parameters for this specific API.
-    # For simplicity, this example assumes direct mapping or runtime intelligence.
-    # A more advanced spec might include parameter mapping rules here.
-
-  "send_notification":
-    type: "nuwa_a2a"
-    target_did: "{contact_did}" # Placeholder, resolved from LLM arguments at runtime
-    service_method: "receiveSimpleMessage"
-# ========= End of ACP =========
-```
-
-### Runtime behaviour
-
-1.  **Install**
-
-   * Router downloads the `.acp.yaml` via CID, verifies `signature`, caches file.
-2.  **Route**
-
-   * For each user message, Router:
-
-     * checks explicit `/back`, `/switch`;
-     * else tests top-of-stack capability;
-     * else classifies message with `triggers` of installed capabilities.
-3.  **Execute**
-
-    *   Router passes message + section `prompt` + `tools` (the interface definitions) to LLM.
-    *   LLM emits a tool call (e.g., `state.*` or a custom tool name from the `tools` manifest).
-    *   **Tool Resolution & Execution**:
-        *   If the tool name is a built-in (e.g., `state.create`), the runtime executes it directly. The object is validated against the capability's `schema` if applicable (e.g., for `state.create`).
-        *   Else, the runtime looks up the tool name in the `tool_bindings` section of the ACP.
-            *   If a binding is found, the runtime uses the specified `type` (e.g., `http_get`, `nuwa_a2a`, `mcp_service`) and associated parameters (e.g., `url`, `target_did`) to execute the tool call, passing the arguments provided by the LLM.
-            *   If no binding is found and the tool is not built-in, the tool call cannot be fulfilled (this should be treated as an error or a specific response to the LLM).
-    *   For `state.*` tools, runtime persists via CR-SQLite / RocksDB + CRDT log; anchors Merkle root per NIP-6.
-4.  **Done / pop**
-
-   * If tool response contains `{"done":true}` *or* Router times out / re-classifies, stack pops.
-
-### Built-in storage tools (`state.*`)
-
-| Tool           | Purpose            | Notes                                |
-| -------------- | ------------------ | ------------------------------------ |
-| `state.create` | Insert full object | Generates CRDT “create” op.          |
-| `state.update` | JSON-Patch diff    | Fields merged per `x-crdt` strategy. |
-| `state.query`  | Mongo-like filter  | Returns stream / pageable cursor.    |
-| `state.delete` | Soft/Hard delete   | Mode governed by permission scope.   |
-
-A capability MUST declare required CRUD verbs in `metadata.permissions.require`.
-The detailed mechanics of state persistence, `memory_scope` isolation, and the issuance of permission tokens (e.g., ZCAP-LD) for these tools may be further elaborated in a dedicated NIP.
-State schemas defined within ACPs MUST conform to the Agent State Model (ASM) as specified in NIP-8. This includes the use of `x-asm` annotations for CRDT policies, lifecycle, and visibility where applicable.
-
-### Registry Interaction Model
-
-The Capability Registry system facilitates the discovery and resolution of ACPs.
-**Publishing** new capabilities or versions is a **client-side action** involving direct interaction with the underlying blockchain. This action results in on-chain events.
-**Discovery and Resolution** are handled by Registry Indexing Services, which listen to these on-chain events, fetch ACP files from IPFS, and build a searchable index. These services SHOULD expose their query functionalities via the **Model Context Protocol (MCP)**.
-
-#### Client-Side Publishing Actions
-
-| Action                | Description                                                                 | Initiator         |
-| --------------------- | --------------------------------------------------------------------------- | ----------------- |
-| `Publish New Version` | Client-side action: package ACP, sign, upload to IPFS, and submit essential registration data (specifically `cap_uri`, `semver`, `cid` of the ACP file on IPFS, and `sha256` hash of the ACP file) to the blockchain. Requires DID authentication by the author. The full ACP YAML is stored on IPFS, not directly on-chain. | Client (e.g., CLI)|
-| `Vote on Capability`  | Client-side action: submit a vote related to a capability\'s governance to a relevant smart contract. (Optional DAO model). | Client (e.g., CLI)|
-
-On-chain implementations (e.g., the `acp-registry-contract`) MUST store at least the `cap_uri`, `semver`, `cid` (Content Identifier for the ACP file on IPFS), and `sha256` (hash of the ACP file for integrity verification). Upon successful publication of a new capability version, the contract MUST emit an event containing these four pieces of information.
-
-#### Registry MCP Service Interface (for Discovery & Resolution)
-
-Registry Indexing Services provide an MCP interface for clients to find and retrieve ACP information. Example MCP actions include:
-
-| MCP Service Action      | Description                                                                 | Input Parameters (example) | Output (example)                                  |
-| ----------------------- | --------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------- |
-| `resolve_capability`    | Resolves the latest (or specific version) of an ACP, returning its metadata and IPFS CID. | `cap_uri: string`          | `{ acp_metadata: object, ipfs_cid: string }` or error |
-| `search_capabilities`   | Performs a full-text or semantic search over indexed ACP metadata.          | `query_string: string`, `filters: map` (optional) | `list_of_results: [{ acp_metadata: object, ipfs_cid: string }, ...]` or error |
-
-Clients would use an SDK to make authenticated (if required by the MCP service, per NIP-6) calls to these MCP actions. The `acp_metadata` in the output would typically be the `metadata` section of the ACP YAML.
+*   Detail the structure of the newly introduced MCP message types (e.g., `ToolQuotationRequest`, `PaymentConfirmation`).
+*   Specify how existing MCP messages (like tool call requests) need to be extended to carry authentication information or payment intent.
+*   Consider how MCP services can discover if a client supports and expects to use these extensions.
 
 ## Rationale
 
-This section explains the "why" behind the design choices in the "Specification" section.
-*   Alternative designs considered and why they were not chosen.
-*   Related work or prior art.
-*   Evidence of community consensus or address significant objections.
-
-(To be defined)
+This section explains the "why" behind the design choices in the "Specification" section. 
+*   Integrating authentication and payment directly into MCP, rather than relying solely on an A2A wrapper, simplifies adoption for existing MCP implementations.
+*   The choice of DID-based authentication (NIP-1, NIP-2) provides a decentralized and robust identity layer.
+*   Adapting payment flows from NIP-4 ensures consistency within the broader Nuwa ecosystem.
+*   Alternative designs, such as using OAuth2 for authentication or a completely separate payment sidecar protocol, were considered but deemed to add more complexity for this specific MCP extension.
 
 ## Backwards Compatibility
 
-Monolithic agents (pre-ACP) remain functional: Router falls back when no capability is triggered.
-Schema version upgrades follow SemVer; incompatible changes require new `Schema URI`.
+*   Existing MCP clients and servers will need to be upgraded to support these new authentication and payment fields/messages.
+*   Servers implementing these extensions should clearly signal their capabilities.
+*   Maintain backward compatibility by allowing clients that do not support these extensions to continue interacting with servers offering only free tools or tools that do not require authentication. Servers can choose to reject unauthenticated/unpaid requests for protected resources.
+*   New message types (`ToolQuotationRequest`, etc.) are additive and will be ignored by older clients/servers. Optional fields in existing messages for signature/payment info should not break parsing for implementations unaware of them.
 
 ## Test Cases
 
+Test cases are highly recommended for all NIPs, and mandatory for NIPs proposing changes to consensus-critical or core protocol components.
+*   **Test Case 1: Successful Authenticated Tool Call (No Payment)**
+    *   Client signs request with its DID.
+    *   Server verifies signature, executes tool, returns result.
+*   **Test Case 2: Failed Authentication (Invalid Signature)**
+    *   Client sends request with an invalid signature.
+    *   Server rejects request with an authentication error.
+*   **Test Case 3: Successful Paid Tool Call (Pre-payment)**
+    *   Client requests quotation.
+    *   Server provides quotation.
+    *   Client makes payment, sends confirmation.
+    *   Server verifies payment, executes tool, returns result.
+*   **Test Case 4: Failed Payment (Payment Verification Fails)**
+    *   Client sends payment confirmation with invalid proof.
+    *   Server rejects tool execution due to payment failure.
+*   **Test Case 5: Interaction with non-supporting server/client**
+    *   Client supporting auth/payment calls a server that does not. Server processes as a normal MCP call if the tool is free/public.
+    *   Client not supporting auth/payment calls a server that requires it for a specific tool. Server returns an error indicating authentication/payment is required.
 
 ## Reference Implementation
 
-<!-- placeholder for a link to the reference implementation (e.g., a GitHub repository or branch) -->
 
 ## Security Considerations
 
-* **Signature validation** — Router MUST reject unsigned or invalid packages.
-* **Sand-boxing** — Tool invocations run in WASM / container with least privilege.
-* **Permission tokens** — Runtime issues ZCAP-LD (Authorization Capabilities for Linked Data, a decentralized authorization standard) tokens scoped to `memory_scope`.
-* **Prompt-injection** — Router SHOULD lint `prompt` for forbidden patterns before mounting.
+All NIPs must include a section discussing security implications.
+*   **Authentication Security**:
+    *   Relies on the security of the underlying DID infrastructure (NIP-1) and signature schemes (NIP-2). Key management by clients and servers is critical.
+    *   Protection against replay attacks for signed requests (e.g., using timestamps and nonces) must be clearly defined in the signature scheme.
+*   **Payment Security**:
+    *   Relies on the security of the payment mechanisms defined in NIP-4.
+    *   Risk of double-spending or payment disputes needs to be handled by the referenced payment protocol.
+    *   Quotation and payment confirmation messages must be protected against tampering.
+*   **Data Privacy**:
+    *   Client DIDs will be exposed to servers. Implications for privacy should be considered.
+*   **Denial of Service**:
+    *   Servers need to protect against resource exhaustion from unauthenticated clients making quotation requests or attempting signature verification. Rate limiting or other DoS protection mechanisms may be needed.
+*   **New Attack Surfaces**:
+    *   The new message types and signature verification logic introduce new potential attack surfaces that must be carefully implemented and tested.
 
 ## Copyright
 
