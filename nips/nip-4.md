@@ -57,19 +57,25 @@ Protocol-level agent interactions—such as message relaying, API gateway access
 
 ## High-Level Flow
 
+The protocol supports two channel initialization modes:
+
+### Mode 1: Direct Initialization (Payer-initiated)
+
+In this mode, the payer directly interacts with the blockchain to create and fund the channel before beginning off-chain payments.
+
 ```mermaid
 sequenceDiagram
     participant Payer
     participant Payee
     participant Blockchain
 
-    Payer->>Blockchain: Lock collateral (create/fund channel)
-    Payer->>Payee: ChannelOpenRequest
-    Payee-->>Payer: ChannelOpenResponse (accepted)
+    Payer->>Blockchain: Open channel (specify payee, asset type)
+    Note over Blockchain: Channel created on-chain
+    Payer->>Blockchain: Deposit to hub (lock collateral)
 
-    loop Initialize sub-channels (once per sub-channel)
-        Payer->>Payee: SubChannelAuthorize (subChannelId, public key)
-        Payee-->>Payer: SubChannelAuthorized
+    loop Authorize sub-channels (once per sub-channel)
+        Payer->>Blockchain: Authorize sub-channel (subChannelId, public key)
+        Note over Blockchain: Sub-channel authorized on-chain
     end
 
     loop Micropayments (off-chain)
@@ -81,8 +87,9 @@ sequenceDiagram
     end
 
     alt Cooperative Close
-        Payer->>Payee: ChannelCloseRequest
+        Payer->>Payee: Notify channel closure
         Payee->>Blockchain: Settle final receipts
+        Payer->>Blockchain: Close channel
     else Unilateral Close
         Payer->>Blockchain: Initiate cancellation
         Payee->>Blockchain: Dispute with newer receipt (if applicable)
@@ -90,6 +97,64 @@ sequenceDiagram
         Payer->>Blockchain: Finalize cancellation
     end
 ```
+
+### Mode 2: Lazy Initialization (Facilitator-assisted)
+
+In this mode, the payer begins sending receipts immediately, and channel creation is deferred until the first receipt is settled. A facilitator (typically the payee or a third-party service) handles on-chain operations and pays gas fees.
+
+```mermaid
+sequenceDiagram
+    participant Payer
+    participant Payee
+    participant Facilitator
+    participant Blockchain
+
+    Payer->>Payee: Request resource (no receipt)
+    Payee-->>Payer: 402 Payment Required (channel requirements)
+
+    Payer->>Payee: Request with Receipt (epoch=0, nonce=0, amount=0)
+    Note over Payee: Verify receipt, delta=0
+    Payee->>Facilitator: Settle request (create channel)
+    Facilitator->>Blockchain: Create channel on-chain (lock collateral)
+    Note over Blockchain: Channel created, epoch=0
+    Blockchain-->>Facilitator: txHash
+    Facilitator-->>Payee: Settlement confirmed
+    Note over Payee: Process request, compute cost
+    Payee-->>Payer: 200 OK + Proposal (nonce=1, amount=cost)
+
+    loop Micropayments (off-chain)
+        Payer->>Payee: Signed Receipt (nonce, accumulatedAmount)
+        Note over Payee: Verify receipt, compute delta
+        alt delta > 0
+            Payee-->>Payer: 200 OK + Proposal (next nonce, next amount)
+            par Async settlement
+                Payee->>Facilitator: Settle receipt (delta > 0)
+                Facilitator->>Blockchain: Transfer delta on-chain
+                Blockchain-->>Facilitator: txHash
+                Facilitator-->>Payee: Settlement confirmed
+            end
+        else delta = 0 (idempotent retry)
+            Payee-->>Payer: 200 OK (no settlement)
+        end
+    end
+
+    alt Cooperative Close
+        Payer->>Payee: Notify channel closure
+        Payee->>Facilitator: Settle final receipts
+        Facilitator->>Blockchain: Close channel
+    else Unilateral Close
+        Facilitator->>Blockchain: Initiate cancellation
+        Payee->>Facilitator: Dispute with newer receipt
+        Facilitator->>Blockchain: Submit dispute receipt
+        Note over Blockchain: Challenge period elapses
+        Facilitator->>Blockchain: Finalize cancellation
+    end
+```
+
+**Key Differences:**
+
+* **Mode 1 (Direct)**: Payer controls channel lifecycle; requires payer to pay gas for initialization; suitable for long-term relationships or when payer has on-chain presence.
+* **Mode 2 (Lazy)**: Lower barrier to entry for payer; facilitator absorbs gas costs; enables immediate usage without on-chain setup; suitable for micropayments and first-time users.
 
 ## Data Model
 
@@ -424,7 +489,8 @@ The protocol supports evolution through:
 | **Off-chain State** | Latest receipt state accepted by payee and stored locally (`offChainLastAccepted`) |
 | **On-chain State** | Latest receipt state confirmed on blockchain through settlement (`onChainConfirmed`) |
 | **Settlement** | The process of confirming a receipt on-chain and transferring funds |
-| **Lazy Channel Creation** | Creating a channel on-chain using the first receipt (typically with `delta=0`) |
+| **Facilitator** | An optional third-party service that verifies receipts, handles on-chain settlement operations, and pays gas fees on behalf of participants (typically the payee or a dedicated service) |
+| **Lazy Channel Creation** | Creating a channel on-chain using the first receipt (typically with `delta=0`) via a facilitator rather than requiring the payer to initialize the channel directly |
 | **Idempotent Retry** | Submitting a receipt with values equal to the last accepted state; results in no state change |
 
 ## Appendix A: Implementation Bindings (Non-normative)
