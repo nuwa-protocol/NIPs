@@ -75,11 +75,11 @@ sequenceDiagram
 
 ```jsonc
 {
-  "chain_id"          : "<uint64>   # identifies ledger instance", 
-  "channel_id"        : "<bytes32>  # deterministic id derived from payer+payee+asset>",
-  "channel_epoch"     : "<uint64>   # prevents replay across resets>",
-  "vm_id_fragment"    : "<string>   # DID verification method fragment (e.g. 'key-1')>",
-  "accumulated_amount": "<uint256>  # total ever sent in this sub-channel>",
+  "chainId"           : "<uint64>   # identifies ledger instance>", 
+  "channelId"         : "<bytes32>  # deterministic id derived from payer+payee+asset>",
+  "channelEpoch"      : "<uint64>   # prevents replay across resets>",
+  "vmIdFragment"      : "<string>   # DID verification method fragment (e.g. 'key-1')>",
+  "accumulatedAmount" : "<uint256>  # total ever sent in this sub-channel>",
   "nonce"             : "<uint64>   # strictly increasing per sub-channel>",
   // NOTE: the signature is transmitted separately; see next section.
 }
@@ -91,18 +91,18 @@ When transporting proofs off-chain it is convenient to bundle the payload and it
 
 ```jsonc
 {
-  "sub_rav": { /* see SubRAV */ },
+  "subRav": { /* see SubRAV */ },
   "signature": "<bytes>" // signature produced according to method_type
 }
 ```
 
-This object is called **SignedSubRAV**.  Protocol messages and HTTP headers SHOULD embed a `signed_sub_rav` field rather than two separate sibling fields.  Smart-contracts, however, still receive `(sub_rav, signature)` as separate parameters for gas efficiency.
+This object is called **SignedSubRAV**.  Protocol messages and HTTP headers SHOULD embed a `signedSubRav` field rather than two separate sibling fields.  Smart-contracts, however, still receive `(subRav, signature)` as separate parameters for gas efficiency.
 
 Ledger contracts receive the **SubRAV payload** *plus* a separate `signature` parameter. They MUST verify:
 
-1. `chain_id` matches the current chain;
-2. `channel_epoch` equals the on-chain epoch for `channel_id`;
-3. `accumulated_amount ≥ last_claimed_amount` and `nonce ≥ last_confirmed_nonce` stored on-chain;
+1. `chainId` matches the current chain;
+2. `channelEpoch` equals the on-chain epoch for `channelId`;
+3. `accumulatedAmount ≥ last_claimed_amount` and `nonce ≥ last_confirmed_nonce` stored on-chain;
 4. `signature` is valid over the canonical serialization of the SubRAV payload, using the **public key and type** recorded when the Sub-Channel was authorised.
 
 ### Canonical Serialization & Signature
@@ -168,11 +168,11 @@ Messages use the secure A2A envelope defined in NIP-2.  They are ledger-agnostic
 ```jsonc
 {
   "type"                : "ChannelOpenRequest",
-  "proposed_channel_id" : "...",   // deterministic suggestion by Payer
-  "payer_did"           : "did:example:payer",
-  "payee_did"           : "did:example:payee",
-  "asset"               : { "symbol": "RGAS", "chain_id": 4 },
-  "initial_collateral"  : "1000"   // as string for uint256
+  "proposedChannelId"   : "...",   // deterministic suggestion by Payer
+  "payerDid"            : "did:example:payer",
+  "payeeDid"            : "did:example:payee",
+  "asset"               : { "symbol": "RGAS", "chainId": 4 },
+  "initialCollateral"   : "1000"   // as string for uint256
 }
 ```
 
@@ -181,9 +181,9 @@ Messages use the secure A2A envelope defined in NIP-2.  They are ledger-agnostic
 ```jsonc
 {
   "type"        : "ChannelOpenResponse",
-  "channel_id"  : "...",          // may echo proposed id or choose another
+  "channelId"   : "...",          // may echo proposed id or choose another
   "status"      : "accepted"|"rejected"|"alternative_proposed",
-  "asset"       : { "symbol": "RGAS", "chain_id": 4 },
+  "asset"       : { "symbol": "RGAS", "chainId": 4 },
   "message"     : "..."
 }
 ```
@@ -195,15 +195,15 @@ Authorises a **verification method** to act as a Sub-Channel.
 ```jsonc
 {
   "type"             : "SubChannelAuthorize",
-  "channel_id"       : "...",
-  "vm_id_fragment"   : "key-1",
-  "public_key_multibase": "...",
-  "method_type"      : "EcdsaSecp256k1VerificationKey2019",
+  "channelId"        : "...",
+  "vmIdFragment"     : "key-1",
+  "publicKeyMultibase": "...",
+  "methodType"       : "EcdsaSecp256k1VerificationKey2019",
   "signature"        : "sig(payer) over canonical json"
 }
 ```
 
-The Payee validates that the key indeed belongs to the Payer’s DID and stores the metadata off-chain; it is later provided to the ledger when first claimed.
+The Payee validates that the key indeed belongs to the Payer's DID and stores the metadata off-chain; it is later provided to the ledger when first claimed.
 
 ### 4. `SubRAV` (Payer ➜ Payee)
 
@@ -229,10 +229,10 @@ Services that do not speak native A2A can still leverage payment channels via a 
 
 `X-Payment-Channel-Data`: Base-64 encoded UTF-8 JSON. The header **MUST** appear at most once per HTTP message.
 
-`client_tx_ref` / `service_tx_ref` are **off-chain transaction references** for this *HTTP request–response* pair:
+`clientTxRef` / `serviceTxRef` are **off-chain transaction references** for this *HTTP request–response* pair:
 
-* **client_tx_ref** – (optional) identifier generated by the client to make the request idempotent on retries.
-* **service_tx_ref** – (optional) identifier generated by the service so the client can correlate logs/billing data.
+* **clientTxRef** – (optional) identifier generated by the client to make the request idempotent on retries.
+* **serviceTxRef** – (optional) identifier generated by the service so the client can correlate logs/billing data.
 
 They are **not** on-chain transaction hashes，nor do they appear inside `SubRAV`.  Implementations MAY omit them if idempotency/audit is handled elsewhere.
 
@@ -240,13 +240,13 @@ They are **not** on-chain transaction hashes，nor do they appear inside `SubRAV
 
 ```jsonc
 {
-  "channel_id"  : "<bytes32>",                // REQUIRED – the target channel
-  "signed_sub_rav" : { ... },                 // REQUIRED – latest Payer-signed SubRAV acknowledged by client
-  "max_amount"     : "<uint256>",            // OPTIONAL – spending limit the client is willing to accept for this request
-  "client_tx_ref"  : "<string>",             // OPTIONAL – idempotency key for client
-  "confirmation_data": {                      // OPTIONAL – client signature over a proposal received in prev response
-    "sub_rav" : { ... },                      //   REQUIRED – Payee-proposed SubRAV to be confirmed
-    "signature_confirmer": "<bytes>"         //   REQUIRED – Payer signature over the proposal
+  "channelId"  : "<bytes32>",                // REQUIRED – the target channel
+  "signedSubRav" : { ... },                 // REQUIRED – latest Payer-signed SubRAV acknowledged by client
+  "maxAmount"     : "<uint256>",            // OPTIONAL – spending limit the client is willing to accept for this request
+  "clientTxRef"  : "<string>",             // OPTIONAL – idempotency key for client
+  "confirmationData": {                      // OPTIONAL – client signature over a proposal received in prev response
+    "subRav" : { ... },                      //   REQUIRED – Payee-proposed SubRAV to be confirmed
+    "signatureConfirmer": "<bytes>"         //   REQUIRED – Payer signature over the proposal
   }
 }
 ```
@@ -255,18 +255,18 @@ They are **not** on-chain transaction hashes，nor do they appear inside `SubRAV
 
 ```jsonc
 {
-  "signed_sub_rav"   : { ... },               // REQUIRED – Payee-proposed next SubRAV (accumulated_amount incremented)
-  "amount_debited"   : "<uint256>",          // REQUIRED – delta applied for this HTTP transaction
-  "service_tx_ref"   : "<string>",           // OPTIONAL – reference id on provider side
-  "error_code"       : 0,                     // OPTIONAL – non-zero if request failed but still billed
+  "signedSubRav"   : { ... },               // REQUIRED – Payee-proposed next SubRAV (accumulatedAmount incremented)
+  "amountDebited"   : "<uint256>",          // REQUIRED – delta applied for this HTTP transaction
+  "serviceTxRef"   : "<string>",           // OPTIONAL – reference id on provider side
+  "errorCode"       : 0,                     // OPTIONAL – non-zero if request failed but still billed
   "message"          : "..."                 // OPTIONAL – human-readable info
 }
 ```
 
 ### Mandatory Verification Steps
 
-* Service **MUST** validate `sub_rav` signature and that `accumulated_amount ≥ previous_claimed`.
-* Client **MUST** validate Payee signature in response before storing the new `sub_rav`.
+* Service **MUST** validate `subRav` signature and that `accumulatedAmount ≥ previous_claimed`.
+* Client **MUST** validate Payee signature in response before storing the new `subRav`.
 * Both parties **SHOULD** use HTTPS/TLS; the header is not confidential but prevents MITM tampering.
 
 ### Error Handling
@@ -304,20 +304,20 @@ Client → Service (Request #1):
 
 ```json
 {
-  "channel_id": "0x35df6e58502089ed640382c477e4b6f99e5e90d881678d37ed774a737fd3797c",
-  "signed_sub_rav": {
-    "sub_rav": {
-      "chain_id": 4,
-      "channel_id": "0x35df6e58502089ed640382c477e4b6f99e5e90d881678d37ed774a737fd3797c",
-      "channel_epoch": 0,
-      "vm_id_fragment": "account-key",
-      "accumulated_amount": "100000000000000000",  // 0.1 RGAS
+  "channelId": "0x35df6e58502089ed640382c477e4b6f99e5e90d881678d37ed774a737fd3797c",
+  "signedSubRav": {
+    "subRav": {
+      "chainId": 4,
+      "channelId": "0x35df6e58502089ed640382c477e4b6f99e5e90d881678d37ed774a737fd3797c",
+      "channelEpoch": 0,
+      "vmIdFragment": "account-key",
+      "accumulatedAmount": "100000000000000000",  // 0.1 RGAS
       "nonce": 5
     },
     "signature": "0x9c520eeef94d4c69912619d2a34358c106cd6f941b67316208470116227e095728a0ae48..."
   },
-  "max_amount": "5000000000000000",              // willing to spend up to 0.005 RGAS this call
-  "client_tx_ref": "client-req-007"
+  "maxAmount": "5000000000000000",              // willing to spend up to 0.005 RGAS this call
+  "clientTxRef": "client-req-007"
 }
 ```
 
@@ -325,35 +325,35 @@ Service → Client (Response #1):
 
 ```json
 {
-  "signed_sub_rav": {
-    "sub_rav": {
-      "chain_id": 4,
-      "channel_id": "0x35df6e58502089ed640382c477e4b6f99e5e90d881678d37ed774a737fd3797c",
-      "channel_epoch": 0,
-      "vm_id_fragment": "account-key",
-      "accumulated_amount": "105000000000000000",  // +0.005 RGAS
+  "signedSubRav": {
+    "subRav": {
+      "chainId": 4,
+      "channelId": "0x35df6e58502089ed640382c477e4b6f99e5e90d881678d37ed774a737fd3797c",
+      "channelEpoch": 0,
+      "vmIdFragment": "account-key",
+      "accumulatedAmount": "105000000000000000",  // +0.005 RGAS
       "nonce": 6
     },
     "signature": "0xa0ae489d9430fda5751e6c6b0c1fef01568db18a0da97450031fd59a768aa7..."
   },
-  "amount_debited": "5000000000000000",
-  "service_tx_ref": "srv-resp-456",
+  "amountDebited": "5000000000000000",
+  "serviceTxRef": "srv-resp-456",
   "message": "Charged 0.005 RGAS"
 }
 ```
 
-Client → Service (Request #2) would include a `confirmation_data` field containing the **exact** `sub_rav` received above plus the Payer’s confirmation signature.
+Client → Service (Request #2) would include a `confirmationData` field containing the **exact** `subRav` received above plus the Payer's confirmation signature.
 
 ### Settlement Strategy
 
 The Service may choose when to submit accumulated SubRAVs on-chain.  High-frequency providers usually:
 
-1. Aggregate until `accumulated_amount - last_claimed ≥ threshold` **or** a timer elapses.
+1. Aggregate until `accumulatedAmount - last_claimed ≥ threshold` **or** a timer elapses.
 2. Call `claim_from_channel` with the latest SubRAV.
 
 ### Security Notes
 
-* **Replay protection** — `client_tx_ref`/`service_tx_ref` SHOULD be logged to detect duplicate HTTP operations.
+* **Replay protection** — `clientTxRef`/`serviceTxRef` SHOULD be logged to detect duplicate HTTP operations.
 * **Header size** — Implementations should compress JSON (e.g., remove whitespace) and be mindful of typical 8-16 KB header limits.
 * **Clock skew** — Not relevant; nonce monotonicity is sufficient.
 
@@ -363,10 +363,10 @@ The header-only pattern is sufficient for metered billing, yet many gateways fin
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/payment-channel/{channel_id}/status` | Return latest `accumulated_amount`, remaining collateral estimate, last `service_tx_ref`, and channel status. |
-| `POST` | `/payment-channel/{channel_id}/close` | Cooperatively close the channel: server returns final SubRAV list for on-chain settlement; may require auth. |
-| `GET` | `/payment-channel/{channel_id}/claims` | Paginated list of on-chain `claim_from_channel` transactions already submitted by the gateway. |
-| `POST` | `/payment-channel/{channel_id}/top-up` | Optional helper to validate a new on-chain deposit and refresh collateral figures. |
+| `GET` | `/payment-channel/{channelId}/status` | Return latest `accumulatedAmount`, remaining collateral estimate, last `serviceTxRef`, and channel status. |
+| `POST` | `/payment-channel/{channelId}/close` | Cooperatively close the channel: server returns final SubRAV list for on-chain settlement; may require auth. |
+| `GET` | `/payment-channel/{channelId}/claims` | Paginated list of on-chain `claim_from_channel` transactions already submitted by the gateway. |
+| `POST` | `/payment-channel/{channelId}/top-up` | Optional helper to validate a new on-chain deposit and refresh collateral figures. |
 
 Design notes:
 
@@ -379,44 +379,44 @@ Design notes:
 ```jsonc
 // GET /payment-channel/0xABCD/status  → 200 OK
 {
-  "channel_id": "0xABCD",
-  "accumulated_amount": "420000000000000000",   // total paid so far
-  "remaining_collateral": "580000000000000000", // still locked in hub
-  "last_service_tx_ref": "srv-resp-789",
+  "channelId": "0xABCD",
+  "accumulatedAmount": "420000000000000000",   // total paid so far
+  "remainingCollateral": "580000000000000000", // still locked in hub
+  "lastServiceTxRef": "srv-resp-789",
   "status": "ACTIVE",
-  "channel_epoch": 0,
-  "sub_channel_count": 3
+  "channelEpoch": 0,
+  "subChannelCount": 3
 }
 
 // GET /payment-channel/0xABCD/claims?page=1  → 200 OK
 {
   "claims": [
     {
-      "tx_hash": "0x99ff...",
-      "vm_id_fragment": "account-key",
+      "txHash": "0x99ff...",
+      "vmIdFragment": "account-key",
       "amount": "5000000000000000",
       "nonce": 6,
-      "timestamp_ms": 1710678123456
+      "timestampMs": 1710678123456
     }
   ],
-  "next_page": null
+  "nextPage": null
 }
 
 // POST /payment-channel/0xABCD/close  → 200 OK
 {
-  "final_sub_ravs": [
-    { "sub_rav": { /* ... */ }, "signature": "0x..." },
-    { "sub_rav": { /* ... */ }, "signature": "0x..." }
+  "finalSubRavs": [
+    { "subRav": { /* ... */ }, "signature": "0x..." },
+    { "subRav": { /* ... */ }, "signature": "0x..." }
   ],
-  "total_to_settle": "420000000000000000",
+  "totalToSettle": "420000000000000000",
   "message": "Submit the above array via claim_from_channel to settle."
 }
 
-// POST /payment-channel/0xABCD/top-up  (body: {"tx_hash": "0xDEAD", "amount": "100000000000000000"})
+// POST /payment-channel/0xABCD/top-up  (body: {"txHash": "0xDEAD", "amount": "100000000000000000"})
 // → 202 Accepted
 {
   "verified": true,
-  "new_collateral": "680000000000000000"
+  "newCollateral": "680000000000000000"
 }
 ```
 
